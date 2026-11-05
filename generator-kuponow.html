@@ -140,7 +140,8 @@
     <section class="panel">
       <div class="tbar">
         <div class="seg">
-          <label class="inl">Zdarzeń <input id="gCount" type="number" min="1" max="20" value="3" style="width:64px"></label>
+          <label class="inl">Zdarzeń <input id="gCount" type="number" min="1" max="20" value="3" style="width:64px" title="maksymalna liczba zdarzeń"></label>
+          <label class="inl" title="Minimalny kurs łączny kuponu — generator dobierze typy z najwyższą szansą, które razem dają co najmniej ten kurs">Kurs min. <input id="gMinTotal" type="number" step="0.1" min="0" placeholder="np. 2.0" style="width:80px"></label>
           <select id="gTypes">
             <option value="safe">🔒 Najpewniejsze</option>
             <option value="value">💎 Value</option>
@@ -920,7 +921,27 @@ function generate(){
   if(!cands.length){alert("Brak zdarzeń spełniających kryteria. Poluzuj filtry.");return}
 
   let best=null;
-  if(targetP>0){
+  const minTotal=parseFloat(String($("gMinTotal").value).replace(",","."))||0;
+  if(minTotal>1){
+    // Najwyższa szansa trafienia przy kursie łącznym ≥ minimum (i ≤ n zdarzeń)
+    const opts=c=>(mode==="value"?c.idx:c.all).map(i=>({id:c.o.id,i,k:c.o.odds[i],p:c.a.fin[i]}));
+    const ok=ch=>{const tot=ch.reduce((a,c)=>a*c.k,1), pr=ch.reduce((a,c)=>a*c.p,1); return tot>=minTotal&&pr>=targetP?pr:-1;};
+    let bestP=-1;
+    // 1) zachłannie: typy o najmniejszym „ryzyku na jednostkę kursu” (−ln p / ln k)
+    const flat=cands.map(c=>opts(c).filter(x=>x.k>1.01).sort((a,b)=>(-Math.log(a.p)/Math.log(a.k))-(-Math.log(b.p)/Math.log(b.k)))[0]).filter(Boolean)
+      .sort((a,b)=>(-Math.log(a.p)/Math.log(a.k))-(-Math.log(b.p)/Math.log(b.k)));
+    const g=[]; for(const x of flat){ if(g.length>=n) break; g.push(x); if(g.reduce((a,c)=>a*c.k,1)>=minTotal) break; }
+    { const v=ok(g); if(v>bestP){bestP=v;best=g.slice();} }
+    // 2) losowe poszukiwanie lepszego zestawu
+    for(let t=0;t<8000;t++){
+      const size=1+(Math.random()*Math.min(n,cands.length)|0);
+      const ch=shuffle([...cands]).slice(0,size).map(c=>{const o=opts(c);return o[Math.random()*o.length|0]});
+      const v=ok(ch); if(v>bestP){bestP=v;best=ch;}
+    }
+    if(!best||bestP<0){
+      const maxTot=cands.sort((a,b)=>Math.max(...opts(b).map(x=>x.k))-Math.max(...opts(a).map(x=>x.k))).slice(0,n).reduce((a,c)=>a*Math.max(...opts(c).map(x=>x.k)),1);
+      alert(`Nie da się ułożyć kuponu z kursem ≥ ${minTotal.toFixed(2)} przy tych ustawieniach (maks. ok. ${maxTot.toFixed(2)}). Zwiększ liczbę zdarzeń, podnieś „Maks. kurs typu” lub zmień rynki.`);return}
+  } else if(targetP>0){
     // Maksymalny kurs łączny przy szansie trafienia ≥ celu
     let bestOdds=0;
     for(let t=0;t<6000;t++){
