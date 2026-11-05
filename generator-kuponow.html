@@ -75,6 +75,13 @@
   .bk a.exact{outline:1px solid #fff}
   .bk a.sts{background:#0b7a3b}.bk a.betclic{background:#d0021b}.bk a.superbet{background:#e3051b}
   .slip .bk a{font-size:9px}
+  .bktabs{display:flex;gap:6px;margin-bottom:10px}
+  .bktabs button{flex:1;padding:7px}
+  .bktabs button.on{outline:2px solid #fff}
+  .pl{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .pl a.go{background:#243244;color:var(--txt);text-decoration:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+  .pl .n{width:20px;height:20px;border-radius:50%;background:#243244;display:grid;place-items:center;font-size:11px}
+  .pl.done{opacity:.45}
 </style>
 </head>
 <body>
@@ -196,6 +203,7 @@
 
   <aside><div class="sticky">
     <div class="slip" id="slip"></div>
+    <div class="panel" id="place" style="margin-top:16px;display:none"></div>
     <div class="panel" style="margin-top:16px">
       <div class="row" style="margin:0 0 8px">
         <label>Stawka (zł) <input id="stake" type="number" min="2" step="1" value="10"></label>
@@ -777,7 +785,25 @@ function renderValue(){
     </tr>`).join("")
     : `<tr><td colspan="10" class="league" style="text-align:center;padding:16px">${offer.length?(mode==="post"?"Brak typów z dodatnim EV po podatku. To normalne: przewaga ponad 13,6% trafia się rzadko.":"Brak typów spełniających kryteria. Zwiększ wagę modelu albo obniż min. szansę."):"Ładowanie meczów…"}</td></tr>`;
 }
-function render(){renderOffer();renderSlip();renderDetailOut();renderBase();renderValue()}
+let placeBk="sts", placeDone={};
+function renderPlace(){
+  const c=calc(), el=$("place");
+  if(!c.n){el.style.display="none";return}
+  el.style.display="";
+  const b=BOOKIES.find(x=>x.key===placeBk);
+  const rows=c.sel.map((o,j)=>{const i=picks[o.id]; o.links=o.links||{};
+    const exact=/^https:\/\//.test(o.links[b.key]||""), url=exact?o.links[b.key]:(b.leagues[o.league]||b.home), k=`${b.key}:${o.id}`;
+    return `<div class="pl ${placeDone[k]?"done":""}"><span class="n">${placeDone[k]?"✓":j+1}</span>
+      <div>${esc(o.home)} – ${esc(o.away)}<div class="league">typ: <b style="color:var(--txt)">${MK[i]}</b> · kurs na kuponie ${o.odds[i].toFixed(2)} · nie stawiaj poniżej <b style="color:var(--txt)">${(1/c.ps[j]).toFixed(2)}</b>${exact?"":` · ${b.leagues[o.league]?"znajdź mecz na liście ligi":"znajdź mecz w ofercie"}`}</div></div>
+      <a class="go" href="${esc(url)}" target="_blank" rel="noopener noreferrer" data-placed="${k}">${exact?"Otwórz mecz ↗":"Otwórz ligę ↗"}</a></div>`}).join("");
+  el.innerHTML=`<h2>🎯 Postaw u bukmachera</h2>
+    <div class="bktabs">${BOOKIES.map(x=>`<button class="sec ${x.key===placeBk?"on":""}" data-bk="${x.key}">${x.name}</button>`).join("")}</div>
+    <p class="hint">Otwórz po kolei każde zdarzenie, dodaj typ do kuponu u bukmachera, wpisz stawkę <b>${zl(c.stake)}</b>${c.isSys?` i wybierz system <b>${c.k} z ${c.n}</b>`:""}. Zakład zawierasz sam, na swoim koncie.</p>
+    ${rows}
+    <p class="hint" style="margin-top:8px">„Nie stawiaj poniżej” = kurs uczciwy według analizy. Jeśli bukmacher daje mniej, ten typ średnio traci jeszcze więcej. Gdy wkleisz w 🔍 dokładny link do meczu, przycisk otworzy od razu ten mecz.</p>
+    <p class="hint">18+ · Graj tylko u legalnych bukmacherów i za kwotę, którą możesz stracić · Pomoc: Telefon Zaufania 801 889 880.</p>`;
+}
+function render(){renderOffer();renderSlip();renderPlace();renderDetailOut();renderBase();renderValue()}
 
 // ================= GENERATOR =================
 function generate(){
@@ -838,7 +864,9 @@ function slipText(){
 
 // ================= ZDARZENIA =================
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-id],[data-del],[data-unpick],[data-detail],[data-afodds],[data-afh2h],#closeDetail"); if(!t) return;
+  const t=e.target.closest("[data-id],[data-del],[data-unpick],[data-detail],[data-afodds],[data-afh2h],[data-bk],[data-placed],#closeDetail"); if(!t) return;
+  if(t.dataset.bk){placeBk=t.dataset.bk;renderPlace();return}
+  if(t.dataset.placed){placeDone[t.dataset.placed]=true;setTimeout(renderPlace,0);return}
   if(t.dataset.afodds||t.dataset.afh2h){ const o=offer.find(x=>x.id==(t.dataset.afodds||t.dataset.afh2h)); if(!o) return;
     t.disabled=true; t.textContent="⏳ pobieram…";
     (t.dataset.afodds?afOdds(o):afH2H(o)).then(()=>{renderDetail();render()}).catch(err=>{t.textContent="⚠️ "+err.message}); return; }
@@ -873,7 +901,7 @@ $("afKey").value=afKey();
 $("afSave").onclick=()=>{const k=$("afKey").value.trim(); if(!k){alert("Wklej klucz API-Football.");return} localStorage.setItem("afKey",k); afEnrich();};
 $("afDel").onclick=()=>{localStorage.removeItem("afKey"); Object.keys(localStorage).filter(k=>k.startsWith("af:")).forEach(k=>localStorage.removeItem(k)); $("afKey").value=""; loadReal(); afStatus("Klucz usunięty z tej przeglądarki.");};
 $("clear").onclick=()=>{picks={};render()};
-$("stake").oninput=renderSlip; $("tax").onchange=renderSlip; $("sysK").onchange=renderSlip;
+$("stake").oninput=()=>{renderSlip();renderPlace()}; $("tax").onchange=()=>{renderSlip();renderPlace()}; $("sysK").onchange=()=>{renderSlip();renderPlace()};
 $("wModel").oninput=()=>{$("wLbl").textContent=$("wModel").value+"%";render()};
 ["m1x2","mDC","mGoals","mBTTS"].forEach(id=>$(id).onchange=()=>{renderOffer();renderValue()});
 ["vFilter","vTax"].forEach(id=>$(id).onchange=renderValue); $("vMinP").oninput=renderValue;
