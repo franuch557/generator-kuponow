@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generator kuponów bukmacherskich</title>
+<style>
+  :root{--bg:#0f1720;--panel:#17212d;--line:#263445;--txt:#e6edf3;--mut:#8b9bb0;--acc:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+  header{padding:18px 24px;border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:20px}
+  header p{margin:4px 0 0;color:var(--mut);font-size:13px}
+  main{display:grid;grid-template-columns:1fr 380px;gap:20px;padding:20px 24px;max-width:1500px;margin:auto}
+  @media(max-width:1000px){main{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px}
+  h2{font-size:15px;margin:0 0 12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  h4{margin:14px 0 6px;font-size:13px;color:var(--mut)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:12px}
+  label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:4px}
+  label.chk{flex-direction:row;align-items:center;gap:6px;padding-bottom:9px}
+  input,select{background:#0c131b;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px}
+  input[type=number]{width:90px}
+  input.sm{width:64px;padding:6px 8px;font-size:13px}
+  button{background:var(--acc);color:#04210f;border:0;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer;font-size:14px}
+  button.sec{background:#243244;color:var(--txt)}
+  button.del{background:transparent;color:var(--bad);padding:4px 6px}
+  button.mag{background:transparent;color:var(--txt);padding:4px 6px}
+  button:hover{filter:brightness(1.1)}
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--mut);font-weight:500;font-size:11px;white-space:nowrap}
+  th.c,td.c{text-align:center}
+  th.sep,td.sep{border-left:1px solid var(--line)}
+  td.odd{cursor:pointer;text-align:center;border-radius:6px;font-variant-numeric:tabular-nums;position:relative}
+  td.odd:hover{background:#22324a}
+  td.odd.sel{background:var(--acc);color:#04210f;font-weight:700}
+  td.odd.val::after{content:"";position:absolute;top:4px;right:3px;width:6px;height:6px;border-radius:50%;background:#38bdf8}
+  td.na{color:#445;text-align:center}
+  tr.active td{background:#1c2a3a}
+  .league{font-size:11px;color:var(--mut)}
+  .conf{font-size:12px;white-space:nowrap}
+  .bar{display:inline-block;width:46px;height:6px;background:#0c131b;border-radius:3px;vertical-align:middle;margin-right:6px;overflow:hidden}
+  .bar i{display:block;height:100%}
+  .num{font-variant-numeric:tabular-nums}
+  .pos{color:#4ade80}.neg{color:#f87171}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:700px){.grid2{grid-template-columns:1fr}}
+  .team{background:#111b26;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .team .row{margin-bottom:6px;gap:8px}
+  .xg{font-size:22px;font-weight:700}
+  .tips{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:4px}
+  .tip{background:#111b26;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;line-height:1.45;color:var(--mut)}
+  .tip b{color:var(--txt);display:block;margin-bottom:2px}
+  /* kupon */
+  .slip{background:#fdfdf8;color:#111;border-radius:10px;padding:18px;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px}
+  .slip h3{text-align:center;margin:0 0 2px;font-size:16px;letter-spacing:.1em}
+  .slip .meta{text-align:center;font-size:11px;color:#555;margin-bottom:10px}
+  .slip .pick{border-top:1px dashed #999;padding:8px 0;display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center}
+  .slip .pick small{display:block;color:#555}
+  .slip .sum{border-top:2px solid #111;margin-top:6px;padding-top:8px}
+  .slip .sum div{display:flex;justify-content:space-between;padding:2px 0;gap:8px}
+  .slip .big{font-size:16px;font-weight:700}
+  .slip .empty{color:#777;text-align:center;padding:30px 0}
+  .slip .x{background:none;color:#b91c1c;padding:0 4px;font-size:14px}
+  .slip .warn{background:#fff4d6;border:1px solid #f0c36d;border-radius:6px;padding:8px;margin-top:10px;font-size:11px;line-height:1.45}
+  .barcode{height:38px;margin-top:12px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px,#111 4px 5px,transparent 5px 8px,#111 8px 11px,transparent 11px 12px)}
+  aside .sticky{position:sticky;top:20px}
+  .note{font-size:11px;color:var(--mut);margin-top:12px;line-height:1.5}
+  .actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .hint{color:var(--mut);font-size:12px;margin:0 0 10px;line-height:1.5}
+  .bk{display:inline-flex;gap:4px;margin-top:3px}
+  .bk a{font-size:10px;font-weight:700;text-decoration:none;padding:1px 5px;border-radius:4px;color:#fff;letter-spacing:.02em}
+  .bk a.exact{outline:1px solid #fff}
+  .bk a.sts{background:#0b7a3b}.bk a.betclic{background:#d0021b}.bk a.superbet{background:#e3051b}
+  .slip .bk a{font-size:9px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎟️ Generator kuponów bukmacherskich</h1>
+  <p>Tylko prawdziwe mecze (dane ESPN): forma, wyniki u siebie / na wyjeździe, stadion, tabela, odpoczynek, H2H, potwierdzone składy i newsy. Kontuzje uzupełniasz ręcznie. Narzędzie poglądowe — nie przyjmuje zakładów.</p>
+</header>
+
+<main>
+  <div>
+    <section class="panel">
+      <h2>Generator</h2>
+      <div class="row">
+        <label>Maks. zdarzeń <input id="gCount" type="number" min="1" max="20" value="4"></label>
+        <label>Min. kurs typu <input id="gMin" type="number" step="0.05" min="1.01" value="1.01"></label>
+        <label>Maks. kurs typu <input id="gMax" type="number" step="0.05" min="1.01" value="3.00"></label>
+        <label>Strategia
+          <select id="gTypes">
+            <option value="safe">🔒 najpewniejsze (najwyższa szansa)</option>
+            <option value="value">💎 value (dodatnia wartość wg modelu)</option>
+            <option value="all">🎲 losowo</option>
+          </select>
+        </label>
+        <label>Min. szansa typu % <input id="gMinP" type="number" step="5" min="0" max="99" value="0"></label>
+      </div>
+      <div class="row">
+        <label title="Generator szuka kuponu z najwyższym kursem, którego szansa trafienia jest co najmniej taka">🎯 Docelowa szansa kuponu % <input id="gTargetP" type="number" step="5" min="0" max="99" value="0" style="width:120px"></label>
+        <label>lub cel kursu łącznego <input id="gTarget" type="number" step="0.5" min="0" value="0"></label>
+        <label>Waga modelu: <b id="wLbl">30%</b> <input id="wModel" type="range" min="0" max="100" value="30" style="width:150px;padding:0"></label>
+        <button id="gen">Generuj kupon</button>
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <span class="league" style="padding-bottom:9px">Rynki:</span>
+        <label class="chk"><input type="checkbox" id="m1x2" checked> 1X2</label>
+        <label class="chk"><input type="checkbox" id="mDC" checked> Podwójna szansa</label>
+        <label class="chk"><input type="checkbox" id="mGoals" checked> Gole (1.5 / 2.5 / 3.5)</label>
+        <label class="chk"><input type="checkbox" id="mBTTS" checked> Obie strzelą</label>
+      </div>
+      <h4>Jak realnie zwiększyć szansę trafienia</h4>
+      <div class="tips">
+        <div class="tip"><b>Mniej zdarzeń</b>Każdy typ mnoży ryzyko. 2 typy po 75% = 56%, 5 typów = 24%.</div>
+        <div class="tip"><b>Podwójna szansa (1X / X2)</b>Remis też wygrywa. Szansa rośnie zwykle z ~50% do ~75–85%, kurs spada.</div>
+        <div class="tip"><b>Bezpieczniejsze linie goli</b>„Powyżej 1.5” lub „poniżej 3.5” wchodzi zwykle w 65–80% meczów.</div>
+        <div class="tip"><b>Kupon systemowy</b>Np. 3 z 4: jeden nietrafiony typ nie przekreśla kuponu — dostajesz część wygranej.</div>
+        <div class="tip"><b>🎯 Docelowa szansa</b>Wpisz np. 60% — generator ułoży kupon z najwyższym kursem przy tej szansie.</div>
+      </div>
+      <p class="hint" style="margin-top:10px">Wyższa szansa zawsze oznacza niższy kurs — żadna metoda nie omija tej zależności. 🔵 kropka przy kursie = model widzi wartość (EV &gt; 0). 🔍 = wszystkie zmienne meczu.</p>
+    </section>
+
+    <section class="panel">
+      <h2>💎 Value bety</h2>
+      <p class="hint">Value bet to typ, w którym analiza ocenia szansę wyżej, niż wynika z kursu. <b>EV</b> = szansa × kurs − 1. W Polsce gra się za 88% stawki (podatek 12%), więc typ jest naprawdę na plus dopiero, gdy <b>EV po podatku</b> &gt; 0, czyli przewaga musi przekroczyć ok. 13,6%. <b>Min. kurs</b> = najniższy kurs, przy którym typ ma sens. Porównaj go z kursem u STS / Betclic / Superbet.</p>
+      <div class="row" style="margin-bottom:8px">
+        <label>Pokaż
+          <select id="vFilter">
+            <option value="pre">EV &gt; 0 (przed podatkiem)</option>
+            <option value="post">EV po podatku &gt; 0</option>
+            <option value="all">wszystkie typy (ranking)</option>
+          </select>
+        </label>
+        <label>Min. szansa % <input id="vMinP" type="number" min="0" max="99" step="5" value="30"></label>
+        <label class="chk"><input type="checkbox" id="vTax" checked> Licz z podatkiem PL</label>
+      </div>
+      <div class="scroll"><table>
+        <thead><tr><th>Mecz</th><th>Typ</th><th class="c">Kurs</th><th class="c">Szansa</th><th class="c">Kurs uczciwy</th><th class="c">Min. kurs</th><th class="c">EV</th><th class="c">EV po podatku</th><th class="c">Rynek vs model</th><th></th></tr></thead>
+        <tbody id="valueList"></tbody>
+      </table></div>
+      <p class="hint" style="margin-top:8px">⚠️ Value istnieje tylko <i>według modelu</i>. Model nie był testowany na historii i nie zna kontuzji, jeśli ich nie wpiszesz. Duże EV oznacza zwykle, że model czegoś nie wie, a nie że bukmacher się pomylił. Wiarygodność rośnie, gdy kilku polskich bukmacherów daje kurs wyższy niż „Min. kurs”.</p>
+    </section>
+
+    <section class="panel">
+      <h2>📊 Co najczęściej wchodzi</h2>
+      <p class="hint">Przybliżone średnie z czołowych lig europejskich (wieloletnie dane; różnią się między ligami i sezonami) oraz średnia szansa w bieżącej ofercie według analizy.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Typ</th><th class="c">Historycznie wchodzi</th><th class="c">Typowy kurs</th><th class="c">Średnio w ofercie</th><th>Uwagi</th></tr></thead>
+        <tbody id="baseRates"></tbody>
+      </table></div>
+      <h4>Co wynika z badań</h4>
+      <div class="tips">
+        <div class="tip"><b>Faworyci tracą mniej</b>Efekt „faworyt–outsider”: na typach z wysokim kursem (outsiderach) gracze tracą procentowo najwięcej, na mocnych faworytach najmniej. Ale w badaniach żadna strategia oparta tylko na kursach nie dawała trwałego zysku.</div>
+        <div class="tip"><b>Najczęściej ≠ najopłacalniej</b>„Powyżej 1.5” czy podwójna szansa wchodzą najczęściej, ale bukmacher wycenia to w kursie. Liczy się, czy kurs jest wyższy od kursu uczciwego (🔵 value), a nie sama częstotliwość.</div>
+        <div class="tip"><b>Porównuj kursy</b>Ten sam typ u różnych bukmacherów ma różne kursy. Wybór najwyższego realnie poprawia wynik — dlatego przy meczach są linki do STS, Betclic i Superbet.</div>
+      </div>
+    </section>
+
+    <section class="panel" id="detail" style="display:none"></section>
+
+    <section class="panel">
+      <h2>Oferta</h2>
+      <div class="row">
+        <label>Gospodarz <input id="aHome" placeholder="np. Legia" style="width:120px"></label>
+        <label>Gość <input id="aAway" placeholder="np. Lech" style="width:120px"></label>
+        <label>Liga <input id="aLeague" placeholder="Ekstraklasa" style="width:100px"></label>
+        <label>1 <input id="a1" class="sm" type="number" step="0.01" value="2.10"></label>
+        <label>X <input id="aX" class="sm" type="number" step="0.01" value="3.30"></label>
+        <label>2 <input id="a2" class="sm" type="number" step="0.01" value="3.40"></label>
+        <label>P 2.5 <input id="aO" class="sm" type="number" step="0.01" placeholder="opc."></label>
+        <label>Pn 2.5 <input id="aU" class="sm" type="number" step="0.01" placeholder="opc."></label>
+        <label>BTTS T <input id="aBY" class="sm" type="number" step="0.01" placeholder="opc."></label>
+        <label>BTTS N <input id="aBN" class="sm" type="number" step="0.01" placeholder="opc."></label>
+        <button class="sec" id="add">+ Dodaj</button>
+        <button class="sec" id="reroll">↻ Odśwież dane</button>
+      </div>
+      <p class="hint" id="dataStatus">⏳ Ładowanie…</p><p class="hint">Mecze: Premier League, LaLiga, Serie A, Bundesliga (Ekstraklasy nie ma w darmowym źródle — możesz ją dodać ręcznie powyżej). Kursy pochodzą od zagranicznych bukmacherów przez ESPN (np. bet365, DraftKings) i są orientacyjne — sprawdź aktualne u STS / Betclic / Superbet i wpisz w 🔍.</p>
+      <div class="scroll">
+      <table>
+        <thead id="offerHead"></thead>
+        <tbody id="offer"></tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+
+  <aside><div class="sticky">
+    <div class="slip" id="slip"></div>
+    <div class="panel" style="margin-top:16px">
+      <div class="row" style="margin:0 0 8px">
+        <label>Stawka (zł) <input id="stake" type="number" min="2" step="1" value="10"></label>
+        <label>Typ kuponu
+          <select id="sysK"></select>
+        </label>
+        <label class="chk"><input id="tax" type="checkbox" checked> Podatek PL</label>
+      </div>
+      <div class="actions">
+        <button class="sec" id="clear">Wyczyść</button>
+        <button class="sec" id="copy">Kopiuj jako tekst</button>
+        <button class="sec" onclick="window.print()">Drukuj</button>
+      </div>
+      <p class="note">System „k z n”: stawka dzielona na wszystkie kombinacje po k typów; każda trafiona kombinacja płaci osobno. Podatek PL: 12% od stawki oraz 10% od wygranej powyżej 2280 zł. Dane w ofercie przykładowej są fikcyjne.</p>
+    </div>
+  </div></aside>
+</main>
+
+<script>
+// ================= DANE (ESPN, bez klucza) =================
+const ESPN="https://site.api.espn.com/apis/site/v2/sports/soccer";
+const ESPN_ST="https://site.api.espn.com/apis/v2/sports/soccer";
+const LEAGUES={"eng.1":"Premier League","esp.1":"LaLiga","ita.1":"Serie A","ger.1":"Bundesliga"};
+const DAYS=7;
+// Rynki (indeks w o.odds)
+const MK  = ["1","X","2","1X (gosp. lub remis)","12 (bez remisu)","X2 (remis lub gość)","Powyżej 1.5 gola","Poniżej 1.5 gola","Powyżej 2.5 gola","Poniżej 2.5 gola","Powyżej 3.5 gola","Poniżej 3.5 gola","Obie strzelą: tak","Obie strzelą: nie"];
+const MKS = ["1","X","2","1X","12","X2","P 1.5","Pn 1.5","P 2.5","Pn 2.5","P 3.5","Pn 3.5","BTTS T","BTTS N"];
+const NM = MK.length;
+const GROUPS = [{i:[0,1,2],t:1,n:"1X2"},{i:[3,4,5],t:2,n:"podw. szansa"},{i:[6,7],t:1,n:"gole 1.5"},{i:[8,9],t:1,n:"gole 2.5"},{i:[10,11],t:1,n:"gole 3.5"},{i:[12,13],t:1,n:"BTTS"}];
+const SHOW = [0,1,2,3,4,5,6,8,9,11,12,13];   // kolumny w tabeli (rzadko przydatne Pn 1.5 i P 3.5 tylko w panelu 🔍)
+const SEP = new Set([3,6,12]);
+const MARGIN = 1.065;
+
+// ================= BUKMACHERZY =================
+// Adresy stron lig sprawdzone na stronach bukmacherów (11.2026). Link do konkretnego meczu
+// wymaga ID zdarzenia z serwisu bukmachera — można go wkleić w panelu 🔍.
+const BOOKIES = [
+  {key:"sts", name:"STS", short:"STS", home:"https://www.sts.pl/zaklady-bukmacherskie", leagues:{
+    "Ekstraklasa":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/polska/ekstraklasa/1/46/201",
+    "Premier League":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/anglia/premier-league/1/1/17",
+    "LaLiga":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/hiszpania/laliga/1/31/8",
+    "Serie A":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/wlochy/serie-a/1/30/23",
+    "Bundesliga":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/niemcy/bundesliga/1/29/35"}},
+  {key:"betclic", name:"Betclic", short:"BC", home:"https://www.betclic.pl/", leagues:{
+    "Ekstraklasa":"https://www.betclic.pl/pilka-nozna-sfootball/ekstraklasa-c221",
+    "Premier League":"https://www.betclic.pl/pilka-nozna-sfootball/premier-league-c3",
+    "LaLiga":"https://www.betclic.pl/pilka-nozna-sfootball/la-liga-c7",
+    "Serie A":"https://www.betclic.pl/pilka-nozna-sfootball/serie-a-c6",
+    "Bundesliga":"https://www.betclic.pl/pilka-nozna-sfootball/bundesliga-c5"}},
+  {key:"superbet", name:"Superbet", short:"SB", home:"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna", leagues:{
+    "Ekstraklasa":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/polska/ekstraklasa/wszystko",
+    "Premier League":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/anglia/premier-league/wszystko",
+    "LaLiga":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/hiszpania/laliga/wszystko",
+    "Serie A":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/wlochy/serie-a/wszystko",
+    "Bundesliga":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/niemcy/bundesliga/wszystko"}}
+];
+function bookieLinks(o){
+  o.links = o.links || {};
+  return `<span class="bk">${BOOKIES.map(b=>{
+    const exact = /^https:\/\//.test(o.links[b.key]||"");
+    const url = exact ? o.links[b.key] : (b.leagues[o.league] || b.home);
+    const what = exact ? "ten mecz" : (b.leagues[o.league] ? `liga ${o.league} — znajdź mecz ${o.home} – ${o.away}` : "oferta piłkarska");
+    return `<a class="${b.key} ${exact?"exact":""}" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${b.name}: ${esc(what)}">${b.short}</a>`;
+  }).join("")}</span>`;
+}
+
+// Historyczne średnie (czołowe ligi europejskie, przybliżenie)
+const BASE = [
+  {i:3, hist:"~74%", note:"gospodarz nie przegrywa"},
+  {i:6, hist:"~75–77%", note:"przy średniej ~2,8 gola/mecz"},
+  {i:5, hist:"~55%", note:"gość nie przegrywa"},
+  {i:4, hist:"~74%", note:"brak remisu"},
+  {i:11,hist:"~68–70%", note:""},
+  {i:8, hist:"~50–55%", note:"zależnie od ligi (Bundesliga/Eredivisie wyżej)"},
+  {i:12,hist:"~50–55%", note:"Eredivisie/Bundesliga najwyżej"},
+  {i:0, hist:"~44–47%", note:"atut własnego boiska słabnie od lat"},
+  {i:2, hist:"~28–30%", note:""},
+  {i:1, hist:"~24–26%", note:"najtrudniejszy do przewidzenia"}
+];
+function renderBase(){
+  $("baseRates").innerHTML = BASE.map(b=>{
+    const vals = offer.map(o=>analyze(o)).map(a=>a.fin[b.i]).filter(x=>x!=null);
+    const odds = offer.map(o=>o.odds[b.i]).filter(x=>x>1).sort((a,b)=>a-b);
+    const avg = vals.length ? vals.reduce((a,c)=>a+c,0)/vals.length : null;
+    const med = odds.length ? odds[odds.length>>1] : null;
+    return `<tr><td>${MK[b.i]}</td><td class="c"><b>${b.hist}</b></td><td class="c num">${med?med.toFixed(2):"–"}</td>
+      <td class="c num">${avg!=null?`<span class="bar"><i style="width:${avg*100}%;background:${confColor(avg)}"></i></span>${pct(avg)}`:"–"}</td><td class="league">${b.note}</td></tr>`;
+  }).join("");
+}
+
+const $ = id => document.getElementById(id);
+let offer = [], picks = {}, nextId = 1, slipNo = genSlipNo(), detailId = null;
+
+function genSlipNo(){return Array.from({length:4},()=>Math.floor(Math.random()*9000+1000)).join("-")}
+const r2 = x => Math.round(x*100)/100;
+const rnd = a => (Math.random()*2-1)*a;
+const clamp = (x,a,b) => Math.min(b,Math.max(a,x));
+const zl = x => x.toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})+" zł";
+const pct = p => (p*100).toFixed(1)+"%";
+const shuffle = a => {for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function fmtDate(d){return d.toLocaleDateString("pl-PL",{weekday:"short",day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})}
+function combos(n,k){const r=[];(function go(s,a){if(a.length===k){r.push(a.slice());return}for(let i=s;i<n;i++){a.push(i);go(i+1,a);a.pop()}})(0,[]);return r}
+
+const neutralTeam = () => ({form:"WDLWD", gf:1.4, ga:1.3, pos:9, inj:0, rest:5});
+const neutralStats = () => ({home:neutralTeam(), away:neutralTeam(), h2h:{hw:0,d:0,aw:0}});
+
+// Podwójna szansa z kursów 1X2 (ta sama marża)
+function dcOdds(o){
+  if(!(o.odds[0]>1&&o.odds[1]>1&&o.odds[2]>1)) return [null,null,null];
+  const inv=[0,1,2].map(i=>1/o.odds[i]), s=inv.reduce((a,b)=>a+b,0), p=inv.map(x=>x/s);
+  return [p[0]+p[1],p[0]+p[2],p[1]+p[2]].map(q=>r2(Math.max(1.01,1/(q*s))));
+}
+
+// ================= MODEL =================
+const formPts = f => { const s=(f||"").toUpperCase().replace(/[^WDLZRP]/g,""); if(!s) return 0.5;
+  return [...s].reduce((a,c)=>a+("WZ".includes(c)?3:"DR".includes(c)?1:0),0)/(3*s.length); };
+
+function poisson(lh, la){
+  const pf=(l,k)=>{let r=Math.exp(-l);for(let i=1;i<=k;i++)r*=l/i;return r};
+  let p1=0,px=0,p2=0,o15=0,o25=0,o35=0,btts=0,top=[];
+  for(let i=0;i<=10;i++) for(let j=0;j<=10;j++){
+    const p=pf(lh,i)*pf(la,j), g=i+j;
+    if(i>j)p1+=p; else if(i===j)px+=p; else p2+=p;
+    if(g>=2)o15+=p; if(g>=3)o25+=p; if(g>=4)o35+=p; if(i>0&&j>0)btts+=p;
+    top.push({s:`${i}:${j}`,p});
+  }
+  top.sort((a,b)=>b.p-a.p);
+  return {p:[p1,px,p2,p1+px,p1+p2,px+p2,o15,1-o15,o25,1-o25,o35,1-o35,btts,1-btts], top:top.slice(0,5)};
+}
+
+function model(o){
+  const H=o.stats.home, A=o.stats.away, h2h=o.stats.h2h;
+  let lh=(H.gf+A.ga)/2, la=(A.gf+H.ga)/2;
+  const f=[{n:"Bazowe xG (atak vs obrona)",h:lh,a:la,base:true}];
+  const apply=(n,mh,ma,info)=>{lh*=mh;la*=ma;f.push({n,mh,ma,info})};
+  const vs=o.stats.venueSplit;
+  apply("Atut własnego boiska",vs?1.04:1.10,vs?0.97:0.92,vs?"reszta już w golach dom/wyjazd":"+10% gosp., −8% gość");
+  const fh=formPts(H.form), fa=formPts(A.form), dF=fh-fa;
+  apply("Forma (ost. mecze)",Math.exp(0.30*dF),Math.exp(-0.30*dF),`${Math.round(fh*100)}% vs ${Math.round(fa*100)}% pkt`);
+  const dP=(A.pos-H.pos)/Math.max(1,(o.stats.teams||18)-1);
+  apply("Pozycja w tabeli",Math.exp(0.22*dP),Math.exp(-0.22*dP),`${H.pos}. vs ${A.pos}.`);
+  apply("Kontuzje / absencje",clamp(1-0.05*H.inj,0.7,1),clamp(1-0.05*A.inj,0.7,1),`${H.inj} vs ${A.inj} kluczowych`);
+  const lu=o.stats.lineup, rot=c=>c==null?1:clamp(1-0.02*Math.max(0,c-2),0.88,1);
+  const hc=lu?.home?.changes, ac=lu?.away?.changes;
+  apply("Skład (zmiany w XI vs poprz. mecz)",rot(hc),rot(ac),!lu?"skład jeszcze nieogłoszony":`${hc??"?"} vs ${ac??"?"} zmian`);
+  const rf=r=>r<3?0.93:r>=6?1.02:1;
+  apply("Zmęczenie (dni odpoczynku)",rf(H.rest),rf(A.rest),`${H.rest} vs ${A.rest} dni`);
+  const n=h2h.hw+h2h.d+h2h.aw, dH=n?(h2h.hw-h2h.aw)/n:0;
+  apply("Bezpośrednie mecze (H2H)",Math.exp(0.10*dH),Math.exp(-0.10*dH),n?`${h2h.hw}-${h2h.d}-${h2h.aw}`:"brak danych");
+  lh=clamp(lh,0.15,4.5); la=clamp(la,0.15,4.5);
+  return {lh,la,factors:f,...poisson(lh,la)};
+}
+
+function market(o){
+  const p=Array(NM).fill(null), m=GROUPS.map(()=>null);
+  GROUPS.forEach((g,gi)=>{
+    if(g.i.some(i=>!(o.odds[i]>1))) return;
+    const inv=g.i.map(i=>1/o.odds[i]), s=inv.reduce((a,b)=>a+b,0);
+    g.i.forEach((i,k)=>p[i]=g.t*inv[k]/s); m[gi]=s/g.t-1;
+  });
+  return {p,m};
+}
+
+const W = () => +$("wModel").value/100;
+function analyze(o){
+  const mo=model(o), mk=market(o), w=W();
+  const fin=mk.p.map((pm,i)=>pm==null?null:w*mo.p[i]+(1-w)*pm);
+  const ev=fin.map((p,i)=>p==null?null:p*o.odds[i]-1);
+  return {mo,mk,fin,ev};
+}
+function allowed(){
+  const a=[...($("m1x2").checked?[0,1,2]:[]),...($("mDC").checked?[3,4,5]:[]),...($("mGoals").checked?[6,7,8,9,10,11]:[]),...($("mBTTS").checked?[12,13]:[])];
+  return a.filter(i=>SHOW.includes(i));
+}
+function bestPick(a,idx){let b=-1;idx.forEach(i=>{if(a.fin[i]!=null&&(b<0||a.fin[i]>a.fin[b]))b=i});return b}
+function confColor(p){return p>=0.7?"#22c55e":p>=0.55?"#84cc16":p>=0.45?"#f59e0b":"#ef4444"}
+function confLabel(p){return p>=0.7?"wysoka":p>=0.55?"średnia":p>=0.45?"niska":"loteria"}
+
+// ================= DANE Z ESPN =================
+const amToDec = s => { const v=parseFloat(String(s).replace("+","")); if(!isFinite(v)||v===0||String(s).toUpperCase()==="EVEN") return String(s).toUpperCase()==="EVEN"?2:null; return r2(v>0?1+v/100:1+100/-v); };
+const ymd = d => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+async function getJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+async function pool(items,n,fn){ const out=[]; let i=0; await Promise.all(Array.from({length:n},async()=>{while(i<items.length){const k=i++; try{out[k]=await fn(items[k])}catch(e){out[k]=null}}})); return out; }
+const status = t => { $("dataStatus").innerHTML=t; };
+const teamCache={}, sumCache={};
+
+function parseOdds(c){
+  const odds=Array(NM).fill(null), o=(c.odds||[])[0]; if(!o) return {odds,provider:null};
+  const pk=x=>x&&((x.close&&x.close.odds)||(x.open&&x.open.odds));
+  const h=amToDec(pk(o.moneyline?.home)), a=amToDec(pk(o.moneyline?.away));
+  const d=o.drawOdds?.moneyLine!=null?amToDec(o.drawOdds.moneyLine):amToDec(pk(o.moneyline?.draw));
+  if(h>1&&d>1&&a>1){odds[0]=h;odds[1]=d;odds[2]=a;}
+  const ln=parseFloat(String(o.total?.over?.close?.line||o.total?.over?.open?.line||"").replace(/[ou]/i,""))||o.overUnder;
+  const ov=amToDec(pk(o.total?.over)), un=amToDec(pk(o.total?.under)), idx={1.5:6,2.5:8,3.5:10}[ln];
+  if(idx!=null&&ov>1&&un>1){odds[idx]=ov;odds[idx+1]=un;}
+  return {odds,provider:o.provider?.displayName||o.provider?.name||null};
+}
+function teamGames(lg,id){
+  const key=lg+"/"+id; if(teamCache[key]) return teamCache[key];
+  return teamCache[key]=getJSON(`${ESPN}/${lg}/teams/${id}/schedule`).then(s=>(s.events||[]).map(e=>{
+    const c=e.competitions[0]; if(!c.status?.type?.completed) return null;
+    const me=c.competitors.find(x=>x.team.id==id), op=c.competitors.find(x=>x.team.id!=id); if(!me||!op) return null;
+    const sc=x=>+(x.score&&typeof x.score==="object"?(x.score.value??x.score.displayValue):x.score);
+    const gf=sc(me), ga=sc(op); if(!isFinite(gf)||!isFinite(ga)) return null;
+    return {date:new Date(e.date),home:me.homeAway==="home",gf,ga,r:gf>ga?"W":gf<ga?"L":"D",opp:op.team.abbreviation||op.team.displayName,id:e.id};
+  }).filter(Boolean).sort((a,b)=>b.date-a.date)).catch(()=>[]);
+}
+function teamStats(games,atHome,kick,stand){
+  const avg=(a,k)=>a.length?a.reduce((x,g)=>x+g[k],0)/a.length:null;
+  const ven=games.filter(g=>g.home===atHome), K=3;
+  const aGF=avg(games,"gf")??1.35, aGA=avg(games,"ga")??1.35;
+  const mix=(v,a,n)=>v==null?a:(v*n+a*K)/(n+K);   // przy małej próbie ciągnie do średniej ogólnej
+  const cnt=r=>ven.filter(g=>g.r===r).length;
+  return {form:games.slice(0,5).map(g=>g.r).join(""), gf:r2(mix(avg(ven,"gf"),aGF,ven.length)), ga:r2(mix(avg(ven,"ga"),aGA,ven.length)),
+    pos:stand?.rank||10, inj:0, rest:games[0]?Math.max(1,Math.round((kick-games[0].date)/864e5)):7,
+    venueRec:ven.length?`${cnt("W")}-${cnt("D")}-${cnt("L")}`:"–", nVenue:ven.length, last5:games.slice(0,5), lastId:games[0]?.id, stand};
+}
+async function standings(lg){
+  const s=await getJSON(`${ESPN_ST}/${lg}/standings`), map={}; let n=0;
+  (s.children||[]).forEach(ch=>(ch.standings?.entries||[]).forEach(e=>{ n++;
+    const g=k=>{const x=e.stats.find(z=>z.name===k);return x?(x.value??x.displayValue):null};
+    map[e.team.id]={rank:+g("rank")||null,pts:g("points"),gp:g("gamesPlayed"),gf:g("pointsFor"),ga:g("pointsAgainst")}; }));
+  return {map,n:n||20};
+}
+const starters = r => (r?.roster||[]).filter(p=>p.starter).map(p=>({id:p.athlete?.id,name:p.athlete?.displayName,pos:p.position?.abbreviation||""}));
+function summary(lg,id){ const k=lg+"/"+id; return sumCache[k]||(sumCache[k]=getJSON(`${ESPN}/${lg}/summary?event=${id}`)); }
+async function loadSummary(o){
+  try{
+    const s=await summary(o.lg,o.espnId);
+    const ss=(s.seasonseries||[]).find(x=>x.type==="head-to-head")||(s.seasonseries||[])[0];
+    if(ss?.events?.length){ const h={hw:0,d:0,aw:0};
+      ss.events.forEach(ev=>{const cs=ev.competitors||[],me=cs.find(x=>x.team?.id==o.homeId),op=cs.find(x=>x.team?.id==o.awayId); if(!me||!op) return;
+        const a=+me.score,b=+op.score; if(!isFinite(a)||!isFinite(b)||ev.statusType?.completed===false) return; a>b?h.hw++:a<b?h.aw++:h.d++;});
+      if(h.hw+h.d+h.aw) o.stats.h2h=h; }
+    o.news=(s.news?.articles||[]).filter(a=>(a.categories||[]).some(c=>c.type==="team"&&[o.homeId,o.awayId].includes(String(c.teamId))))
+      .slice(0,6).map(a=>({t:a.headline,u:a.links?.web?.href}));
+    const ros=s.rosters||[], rh=ros.find(r=>r.homeAway==="home"), ra=ros.find(r=>r.homeAway==="away");
+    const xh=starters(rh), xa=starters(ra);
+    if(xh.length>=11||xa.length>=11){
+      const lu={home:{xi:xh,formation:rh?.formation,changes:null},away:{xi:xa,formation:ra?.formation,changes:null}};
+      for(const side of ["home","away"]){ const lid=o.stats[side].lastId; if(!lid||lu[side].xi.length<11) continue;
+        try{ const p=await summary(o.lg,lid); const tid=side==="home"?o.homeId:o.awayId;
+             const prev=starters((p.rosters||[]).find(r=>r.team?.id==tid)).map(x=>x.id);
+             if(prev.length>=11) lu[side].changes=lu[side].xi.filter(x=>!prev.includes(x.id)).length; }catch{} }
+      o.stats.lineup=lu;
+    }
+  }catch(e){}
+}
+async function loadReal(){
+  offer=[];picks={};detailId=null;renderDetail();render();
+  status("⏳ Pobieram terminarz z ESPN…");
+  const now=new Date(), days=[...Array(DAYS).keys()].map(i=>ymd(new Date(now.getTime()+i*864e5)));
+  const jobs=[]; Object.keys(LEAGUES).forEach(lg=>days.forEach(d=>jobs.push({lg,d})));
+  const sbs=await pool(jobs,8,j=>getJSON(`${ESPN}/${j.lg}/scoreboard?dates=${j.d}`).then(r=>({lg:j.lg,r})));
+  const seen=new Set(), raw=[];
+  sbs.filter(Boolean).forEach(({lg,r})=>(r.events||[]).forEach(e=>{
+    if(seen.has(e.id)) return; seen.add(e.id);
+    const c=e.competitions[0]; if(c.status?.type?.state!=="pre") return;
+    const H=c.competitors.find(x=>x.homeAway==="home"), A=c.competitors.find(x=>x.homeAway==="away"); if(H&&A) raw.push({lg,e,c,H,A});
+  }));
+  if(!raw.length){status("⚠️ Nie udało się pobrać meczów (brak połączenia z ESPN albo brak spotkań w najbliższych dniach). Spróbuj „Odśwież dane”.");return}
+  status(`⏳ Znaleziono ${raw.length} meczów. Pobieram tabele, wyniki drużyn, H2H i składy…`);
+  const stl={}; await pool(Object.keys(LEAGUES),4,async lg=>{try{stl[lg]=await standings(lg)}catch{stl[lg]={map:{},n:20}}});
+  let done=0;
+  const built=await pool(raw,6,async m=>{
+    const [gh,ga]=await Promise.all([teamGames(m.lg,m.H.team.id),teamGames(m.lg,m.A.team.id)]);
+    const kick=new Date(m.e.date), st=stl[m.lg], {odds,provider}=parseOdds(m.c);
+    const o={id:nextId++,espnId:m.e.id,lg:m.lg,home:m.H.team.displayName,away:m.A.team.displayName,homeId:m.H.team.id,awayId:m.A.team.id,
+      league:LEAGUES[m.lg],date:kick,venue:m.c.venue?.fullName||"",city:m.c.venue?.address?.city||"",neutral:!!m.c.neutralSite,provider,odds,real:true,news:[],
+      stats:{home:teamStats(gh,true,kick,st.map[m.H.team.id]),away:teamStats(ga,false,kick,st.map[m.A.team.id]),h2h:{hw:0,d:0,aw:0},teams:st.n,venueSplit:true,lineup:null}};
+    dcOdds(o).forEach((k,i)=>o.odds[3+i]=k);
+    await loadSummary(o);
+    status(`⏳ Analizuję mecze… ${++done}/${raw.length}`);
+    return o;
+  });
+  offer=built.filter(Boolean).sort((a,b)=>a.date-b.date);
+  const noOdds=offer.filter(o=>!o.odds[0]).length, lus=offer.filter(o=>o.stats.lineup).length;
+  status(`✅ ${offer.length} prawdziwych meczów z najbliższych ${DAYS} dni · dane: ESPN · kursy: ${offer.find(o=>o.provider)?.provider||"brak"}${noOdds?` · ${noOdds} bez kursów (wpisz w 🔍)`:""} · potwierdzone składy: ${lus} · pobrano ${new Date().toLocaleTimeString("pl-PL")}`);
+  render();
+}
+
+// ================= RENDER =================
+function renderHead(){
+  $("offerHead").innerHTML=`<tr><th>Mecz</th><th>Data</th>${SHOW.map(i=>`<th class="c ${SEP.has(i)?"sep":""}">${MKS[i]}</th>`).join("")}<th class="sep">Najpewniejszy typ</th><th class="c">xG</th><th></th></tr>`;
+}
+function renderOffer(){
+  const al=allowed();
+  $("offer").innerHTML=offer.map(o=>{
+    const a=analyze(o), b=bestPick(a,al.length?al:[0,1,2]), pb=b>=0?a.fin[b]:0;
+    return `<tr class="${detailId===o.id?"active":""}">
+      <td>${esc(o.home)} – ${esc(o.away)}<div class="league">${esc(o.league)}${o.venue?` · 🏟 ${esc(o.venue)}${o.city?", "+esc(o.city):""}`:""}${o.stats.lineup?" · ✅ składy":""}</div>${bookieLinks(o)}</td>
+      <td class="league">${fmtDate(o.date)}</td>
+      ${SHOW.map(i=>{const k=o.odds[i], sep=SEP.has(i)?"sep":"";return k>1
+        ?`<td class="odd ${sep} ${picks[o.id]===i?"sel":""} ${a.ev[i]>0?"val":""}" data-id="${o.id}" data-i="${i}" title="${MK[i]} · szansa ${pct(a.fin[i])} · EV ${(a.ev[i]*100).toFixed(1)}%">${k.toFixed(2)}</td>`
+        :`<td class="na ${sep}">–</td>`}).join("")}
+      <td class="conf sep">${b>=0?`<span class="bar"><i style="width:${pb*100}%;background:${confColor(pb)}"></i></span><b>${MKS[b]}</b> ${pct(pb)}`:"–"}</td>
+      <td class="c num league">${a.mo.lh.toFixed(2)}–${a.mo.la.toFixed(2)}</td>
+      <td style="white-space:nowrap"><button class="mag" data-detail="${o.id}" title="Szczegóły analizy">🔍</button><button class="del" data-del="${o.id}" title="Usuń">✕</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function teamExtra(o,side){
+  const t=o.stats[side]; if(!o.real) return "";
+  const res=(t.last5||[]).map(g=>`<span title="${g.home?"dom":"wyjazd"} vs ${esc(g.opp)}" style="display:inline-block;min-width:18px;text-align:center;border-radius:4px;margin-right:2px;font-weight:700;color:#04210f;background:${g.r==="W"?"#22c55e":g.r==="D"?"#f59e0b":"#ef4444"}">${g.r}</span><span class="league" style="margin-right:6px">${g.gf}:${g.ga} ${esc(g.opp)}${g.home?"":"(w)"}</span>`).join("");
+  const st=t.stand;
+  return `<p class="hint" style="margin:6px 0 0">Ostatnie mecze: ${res||"brak"}<br>
+    ${side==="home"?"U siebie":"Na wyjeździe"}: ${t.venueRec} (W-R-P, ${t.nVenue} mecz.) · gole dom/wyj. uśrednione z ogólnymi${st?` · tabela: ${st.rank}. miejsce, ${st.pts} pkt, bramki ${st.gf}:${st.ga}`:""}</p>`;
+}
+function lineupBox(o){
+  if(!o.real) return "";
+  const lu=o.stats.lineup;
+  if(!lu) return `<h4>👥 Składy</h4><p class="hint">Jeszcze nieogłoszone — kluby podają je zwykle ok. godzinę przed meczem. Kliknij „Odśwież dane” bliżej startu, a model uwzględni zmiany w składzie.</p>`;
+  const col=(side,name)=>{const x=lu[side];return `<div class="team"><b>${esc(name)}</b> <span class="league">${x.formation||""}${x.changes!=null?` · ${x.changes} zmian vs poprzedni mecz`:""}</span><div class="league" style="margin-top:6px;line-height:1.6">${x.xi.map(p=>`${esc(p.pos)} ${esc(p.name)}`).join(" · ")||"brak"}</div></div>`};
+  return `<h4>👥 Potwierdzone składy</h4><div class="grid2">${col("home",o.home)}${col("away",o.away)}</div>`;
+}
+function renderDetail(){
+  const o=offer.find(x=>x.id===detailId), el=$("detail");
+  if(!o){el.style.display="none";return}
+  el.style.display="";
+  const teamBox=(side,name)=>{const t=o.stats[side];return `<div class="team"><b>${esc(name)}</b> <span class="league">${side==="home"?"gospodarz":"gość"}</span>
+    <div class="row" style="margin-top:8px">
+      <label>Forma (W/D/L) <input data-s="${side}" data-k="form" value="${esc(t.form)}" style="width:90px"></label>
+      <label>Gole strzel./mecz <input class="sm" type="number" step="0.1" data-s="${side}" data-k="gf" value="${t.gf}"></label>
+      <label>Gole strac./mecz <input class="sm" type="number" step="0.1" data-s="${side}" data-k="ga" value="${t.ga}"></label>
+    </div><div class="row">
+      <label>Pozycja <input class="sm" type="number" min="1" max="24" data-s="${side}" data-k="pos" value="${t.pos}"></label>
+      <label>Kontuzje kluczowe ✍️ <input class="sm" type="number" min="0" max="8" data-s="${side}" data-k="inj" value="${t.inj}" title="Wpisz ręcznie — źródło danych nie podaje kontuzji"></label>
+      <label>Dni odpoczynku <input class="sm" type="number" min="1" max="14" data-s="${side}" data-k="rest" value="${t.rest}"></label>
+    </div>${teamExtra(o,side)}</div>`};
+  const h=o.stats.h2h, oddIn=i=>`<label>${MKS[i]} <input class="sm" type="number" step="0.01" data-odd="${i}" value="${o.odds[i]||""}" ${i>=3&&i<=5?'disabled title="liczone z 1X2"':""}></label>`;
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🔍 Analiza: ${esc(o.home)} – ${esc(o.away)}</h2><button class="sec" id="closeDetail">Zamknij</button></div>
+    ${o.real?`<p class="hint">🏟 ${esc(o.venue||"stadion nieznany")}${o.city?", "+esc(o.city):""} · ${fmtDate(o.date)}${o.neutral?" · teren neutralny":""} · <a href="https://www.espn.com/soccer/match/_/gameId/${o.espnId}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">mecz na ESPN</a></p>`:""}
+    ${lineupBox(o)}
+    ${o.news?.length?`<h4>📰 Newsy drużyn (sprawdź kontuzje i absencje)</h4><ul class="hint" style="margin:0 0 6px;padding-left:18px">${o.news.map(n=>`<li>${n.u?`<a href="${esc(n.u)}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">${esc(n.t)}</a>`:esc(n.t)}</li>`).join("")}</ul>`:""}
+    <h4>Zmienne wejściowe ${o.real?'<span class="league">(pobrane automatycznie — możesz poprawić)</span>':""}</h4>
+    <div class="grid2">${teamBox("home",o.home)}${teamBox("away",o.away)}</div>
+    <div class="row" style="margin-top:10px">
+      <label>H2H wygr. gosp. <input class="sm" type="number" min="0" data-s="h2h" data-k="hw" value="${h.hw}"></label>
+      <label>H2H remisy <input class="sm" type="number" min="0" data-s="h2h" data-k="d" value="${h.d}"></label>
+      <label>H2H wygr. gościa <input class="sm" type="number" min="0" data-s="h2h" data-k="aw" value="${h.aw}"></label>
+    </div>
+    <h4>Kursy bukmachera</h4>
+    <div class="row">${[...Array(NM).keys()].map(oddIn).join("")}</div>
+    <h4>Linki do tego meczu u bukmacherów</h4>
+    <p class="hint">Domyślnie link prowadzi do strony ligi. Otwórz mecz u bukmachera, skopiuj adres z paska i wklej tutaj — wtedy link prowadzi prosto do zdarzenia (biała ramka przy skrócie).</p>
+    <div class="row">${BOOKIES.map(b=>`<label>${b.name} <input data-link="${b.key}" value="${esc((o.links||{})[b.key]||"")}" placeholder="https://… (opcjonalnie)" style="width:240px"></label>`).join("")}</div>
+    <div id="detailOut"></div>`;
+  renderDetailOut();
+}
+function renderDetailOut(){
+  const o=offer.find(x=>x.id===detailId); if(!o||!$("detailOut")) return;
+  const a=analyze(o), w=W();
+  const fac=a.mo.factors.map(f=>f.base
+    ?`<tr><td>${f.n}</td><td class="c num">${f.h.toFixed(2)}</td><td class="c num">${f.a.toFixed(2)}</td><td class="league">średnia ataku i obrony rywala</td></tr>`
+    :`<tr><td>${f.n}</td><td class="c num ${f.mh>1.001?"pos":f.mh<0.999?"neg":""}">×${f.mh.toFixed(3)}</td><td class="c num ${f.ma>1.001?"pos":f.ma<0.999?"neg":""}">×${f.ma.toFixed(3)}</td><td class="league">${f.info}</td></tr>`).join("");
+  const mk=MK.map((n,i)=>`<tr><td>${n}</td><td class="c num">${o.odds[i]>1?o.odds[i].toFixed(2):"–"}</td>
+     <td class="c num">${a.mk.p[i]!=null?pct(a.mk.p[i]):"–"}</td><td class="c num">${pct(a.mo.p[i])}</td>
+     <td class="c num"><b>${a.fin[i]!=null?pct(a.fin[i]):"–"}</b></td>
+     <td class="c num ${a.ev[i]>0?"pos":"neg"}">${a.ev[i]!=null?(a.ev[i]>0?"+":"")+(a.ev[i]*100).toFixed(1)+"%":"–"}</td>
+     <td class="c num">${a.fin[i]!=null?(1/a.fin[i]).toFixed(2):"–"}</td></tr>`).join("");
+  $("detailOut").innerHTML=`
+    <div class="grid2">
+      <div><h4>Wpływ zmiennych na oczekiwane gole</h4>
+        <table><thead><tr><th>Czynnik</th><th class="c">Gosp.</th><th class="c">Gość</th><th>Dane</th></tr></thead><tbody>${fac}
+        <tr><td><b>Oczekiwane gole (xG)</b></td><td class="c xg">${a.mo.lh.toFixed(2)}</td><td class="c xg">${a.mo.la.toFixed(2)}</td><td></td></tr></tbody></table>
+      </div>
+      <div><h4>Najbardziej prawdopodobne wyniki (Poisson)</h4>
+        <table><tbody>${a.mo.top.map(t=>`<tr><td>${t.s}</td><td class="num"><span class="bar"><i style="width:${t.p*400}%;background:#38bdf8"></i></span>${pct(t.p)}</td></tr>`).join("")}</tbody></table>
+        <p class="hint" style="margin-top:8px">Marża bukmachera: ${a.mk.m.map((m,i)=>m==null?null:GROUPS[i].n+" "+pct(m)).filter(Boolean).join(" · ")}</p>
+      </div>
+    </div>
+    <h4>Porównanie rynków (waga modelu ${Math.round(w*100)}%)</h4>
+    <div class="scroll"><table><thead><tr><th>Typ</th><th class="c">Kurs</th><th class="c">Rynek</th><th class="c">Model</th><th class="c">Finalna</th><th class="c">EV</th><th class="c">Kurs uczciwy</th></tr></thead><tbody>${mk}</tbody></table></div>
+    <p class="hint" style="margin-top:8px">EV = szansa finalna × kurs − 1 (przed podatkiem). Dodatnie EV oznacza tylko, że <i>model</i> ocenia szansę wyżej niż rynek — przy niepełnych danych ta „wartość” jest złudna.</p>`;
+}
+
+// ================= KUPON / SYSTEM =================
+function selected(){return offer.filter(o=>picks[o.id]!==undefined)}
+function renderSysSelect(){
+  const n=selected().length, el=$("sysK"), cur=+el.value||n;
+  let opts=`<option value="${n}">AKO (wszystkie ${n||""})</option>`;
+  if(n<=12) for(let k=n-1;k>=1;k--) opts+=`<option value="${k}">System ${k} z ${n} (${combos(n,k).length} komb.)</option>`;
+  el.innerHTML=opts; el.value = cur<n&&cur>=1&&n<=12 ? cur : n;
+}
+function calc(){
+  const sel=selected(), n=sel.length;
+  const stake=Math.max(0,parseFloat($("stake").value)||0), taxOn=$("tax").checked;
+  const k=Math.min(n,Math.max(1,+$("sysK").value||n));
+  const cs=n?combos(n,k):[], per=cs.length?stake/cs.length:0, perIn=taxOn?per*0.88:per;
+  const ps=sel.map(o=>analyze(o).fin[picks[o.id]]), ks=sel.map(o=>o.odds[picks[o.id]]);
+  const cOdds=cs.map(c=>c.reduce((a,i)=>a*ks[i],1));
+  const net=g=>g-(taxOn&&g>2280?g*0.10:0);
+  let pAny=0,pProfit=0,expNet=0;
+  if(n && n<=16){
+    for(let mask=0;mask<(1<<n);mask++){
+      let pr=1; for(let i=0;i<n;i++) pr*= (mask>>i&1)?ps[i]:1-ps[i];
+      let g=0; cs.forEach((c,ci)=>{ if(c.every(i=>mask>>i&1)) g+=perIn*cOdds[ci]; });
+      const nt=net(g); expNet+=pr*nt; if(nt>0)pAny+=pr; if(nt>=stake)pProfit+=pr;
+    }
+  }
+  const total=ks.reduce((a,b)=>a*b,1), maxGross=perIn*cOdds.reduce((a,b)=>a+b,0);
+  return {sel,n,k,isSys:k<n,cs,per,stake,taxOn,total,maxGross,maxNet:net(maxGross),pAny,pProfit,ev:expNet-stake,ps};
+}
+
+function renderSlip(){
+  renderSysSelect();
+  const c=calc(), now=new Date();
+  let html=`<h3>${c.isSys?`KUPON SYSTEM ${c.k}/${c.n}`:"KUPON AKO"}</h3><div class="meta">Nr ${slipNo} · ${now.toLocaleString("pl-PL")}</div>`;
+  if(!c.n) html+=`<div class="empty">Kupon jest pusty.<br>Kliknij kurs lub wygeneruj kupon.</div>`;
+  else{
+    html+=c.sel.map((o,j)=>{const i=picks[o.id];return `
+      <div class="pick">
+        <div>${esc(o.home)} – ${esc(o.away)}<small>${esc(o.league)} · ${fmtDate(o.date)}<br>typ: <b>${MK[i]}</b> · szansa ${pct(c.ps[j])}</small>${bookieLinks(o)}</div>
+        <b>${o.odds[i].toFixed(2)}</b>
+        <button class="x" data-unpick="${o.id}" title="Usuń z kuponu">✕</button>
+      </div>`}).join("");
+    html+=`<div class="sum">
+      <div><span>Zdarzeń</span><span>${c.n}</span></div>
+      ${c.isSys?`<div><span>Kombinacji</span><span>${c.cs.length} × ${zl(c.per)}</span></div>`:""}
+      <div><span>Kurs łączny${c.isSys?" (wszystkie)":""}</span><b>${c.total.toFixed(2)}</b></div>
+      <div><span>Stawka</span><span>${zl(c.stake)}</span></div>
+      ${c.taxOn?`<div><span>Podatek od gier (12%)</span><span>-${zl(c.stake*0.12)}</span></div>`:""}
+      <div class="big"><span>${c.isSys?"Maks. wypłata":"Do wypłaty"}</span><span>${zl(c.maxNet)}</span></div>
+      <div style="border-top:1px dashed #999;margin-top:6px;padding-top:6px"><span>${c.isSys?"Szansa na jakąkolwiek wygraną":"Szansa trafienia kuponu"}</span><b style="color:${confColor(c.pAny)}">${pct(c.pAny)}</b></div>
+      ${c.isSys?`<div><span>Szansa na zysk (≥ stawki)</span><b style="color:${confColor(c.pProfit)}">${pct(c.pProfit)}</b></div>`:""}
+      ${c.isSys
+        ? `<div><span>Ze stratą kończy się ok.</span><span>${Math.round((1-c.pProfit)*10)} na 10 kuponów</span></div>`
+        : `<div><span>Przegrywa ok.</span><span>${Math.round((1-c.pAny)*10)} na 10 kuponów</span></div>`}
+      <div><span>Oczekiwany wynik</span><b style="color:${c.ev>=0?"#15803d":"#b91c1c"}">${c.ev>=0?"+":""}${zl(c.ev)}</b></div>
+    </div>
+    <div class="warn">⚠️ Nie ma pewniaczków. Wyższa szansa = niższy kurs. Model to szacunek z wpisanych danych — nie zna składów, pogody ani przypadku. Marża i podatek sprawiają, że kupony średnio tracą.</div>
+    <div class="barcode"></div>`;
+  }
+  $("slip").innerHTML=html;
+}
+function renderValue(){
+  const mode=$("vFilter").value, minP=(parseFloat($("vMinP").value)||0)/100, taxF=$("vTax").checked?0.88:1;
+  const al=allowed(), rows=[];
+  offer.forEach(o=>{ const a=analyze(o);
+    al.forEach(i=>{ const k=o.odds[i], p=a.fin[i]; if(!(k>1)||p==null||p<minP) return;
+      const ev=p*k-1, evT=p*k*taxF-1;
+      if(mode==="pre"&&ev<=0) return; if(mode==="post"&&evT<=0) return;
+      rows.push({o,i,k,p,ev,evT,fair:1/p,minK:1/(p*taxF),mk:a.mk.p[i],mo:a.mo.p[i]}); }); });
+  rows.sort((x,y)=>y.ev-x.ev);
+  $("valueList").innerHTML = rows.length ? rows.slice(0,40).map(r=>`<tr>
+      <td>${esc(r.o.home)} – ${esc(r.o.away)}<div class="league">${esc(r.o.league)} · ${fmtDate(r.o.date)}</div>${bookieLinks(r.o)}</td>
+      <td><b>${MKS[r.i]}</b></td>
+      <td class="odd ${picks[r.o.id]===r.i?"sel":""}" data-id="${r.o.id}" data-i="${r.i}" title="Dodaj do kuponu">${r.k.toFixed(2)}</td>
+      <td class="c num">${pct(r.p)}</td>
+      <td class="c num">${r.fair.toFixed(2)}</td>
+      <td class="c num"><b>${r.minK.toFixed(2)}</b></td>
+      <td class="c num ${r.ev>0?"pos":"neg"}">${r.ev>0?"+":""}${(r.ev*100).toFixed(1)}%</td>
+      <td class="c num ${r.evT>0?"pos":"neg"}">${r.evT>0?"+":""}${(r.evT*100).toFixed(1)}%</td>
+      <td class="c num league">${r.mk!=null?pct(r.mk):"–"} / ${pct(r.mo)}</td>
+      <td><button class="mag" data-detail="${r.o.id}" title="Szczegóły analizy">🔍</button></td>
+    </tr>`).join("")
+    : `<tr><td colspan="10" class="league" style="text-align:center;padding:16px">${offer.length?(mode==="post"?"Brak typów z dodatnim EV po podatku. To normalne: przewaga ponad 13,6% trafia się rzadko.":"Brak typów spełniających kryteria. Zwiększ wagę modelu albo obniż min. szansę."):"Ładowanie meczów…"}</td></tr>`;
+}
+function render(){renderOffer();renderSlip();renderDetailOut();renderBase();renderValue()}
+
+// ================= GENERATOR =================
+function generate(){
+  const al=allowed(); if(!al.length){alert("Zaznacz przynajmniej jeden rynek.");return}
+  const n=Math.max(1,parseInt($("gCount").value)||1);
+  const min=parseFloat($("gMin").value)||1.01, max=parseFloat($("gMax").value)||100;
+  const mode=$("gTypes").value, target=parseFloat($("gTarget").value)||0;
+  const minP=(parseFloat($("gMinP").value)||0)/100, targetP=(parseFloat($("gTargetP").value)||0)/100;
+  const cands=[];
+  offer.forEach(o=>{
+    const a=analyze(o);
+    let idx=al.filter(i=>o.odds[i]>=min&&o.odds[i]<=max&&a.fin[i]!=null&&a.fin[i]>=minP);
+    if(mode==="value") idx=idx.filter(i=>a.ev[i]>0);
+    if(!idx.length) return;
+    const all=idx.slice();
+    if(mode==="safe") idx=[bestPick(a,idx)];
+    if(mode==="value") idx=[idx.reduce((b,i)=>a.ev[i]>a.ev[b]?i:b)];
+    cands.push({o,a,idx,all,score:mode==="value"?a.ev[idx[0]]:a.fin[idx[0]]});
+  });
+  if(!cands.length){alert("Brak zdarzeń spełniających kryteria. Poluzuj filtry.");return}
+
+  let best=null;
+  if(targetP>0){
+    // Maksymalny kurs łączny przy szansie trafienia ≥ celu
+    let bestOdds=0;
+    for(let t=0;t<6000;t++){
+      const size=1+(Math.random()*Math.min(n,cands.length)|0);
+      const ch=shuffle([...cands]).slice(0,size).map(c=>{const pool=mode==="value"?c.idx:c.all;const i=pool[Math.random()*pool.length|0];return {id:c.o.id,i,k:c.o.odds[i],p:c.a.fin[i]}});
+      const pr=ch.reduce((a,c)=>a*c.p,1), tot=ch.reduce((a,c)=>a*c.k,1);
+      if(pr>=targetP && tot>bestOdds){bestOdds=tot;best=ch}
+    }
+    if(!best){const top=Math.max(...cands.map(c=>Math.max(...c.all.map(i=>c.a.fin[i]))));
+      alert(`Nie da się osiągnąć szansy ${Math.round(targetP*100)}% przy tych filtrach. Najpewniejszy pojedynczy typ ma ${pct(top)}.`);return}
+  } else {
+    if(cands.length<n){alert(`Za mało zdarzeń spełniających kryteria (${cands.length}/${n}). Poluzuj filtry lub dodaj mecze.`);return}
+    if(mode!=="all"&&!(target>0)){
+      best=cands.sort((x,y)=>y.score-x.score).slice(0,n).map(c=>({id:c.o.id,i:c.idx[0]}));
+    } else {
+      let bestDiff=Infinity; const tries=target>0?3000:1;
+      for(let t=0;t<tries;t++){
+        const ch=shuffle([...cands]).slice(0,n).map(c=>{const pool=target>0&&mode!=="value"?c.all:c.idx;const i=pool[Math.random()*pool.length|0];return {id:c.o.id,i,k:c.o.odds[i]}});
+        const tot=ch.reduce((a,c)=>a*c.k,1), diff=target>0?Math.abs(Math.log(tot/target)):0;
+        if(diff<bestDiff){bestDiff=diff;best=ch}
+      }
+    }
+  }
+  picks={}; best.forEach(c=>picks[c.id]=c.i);
+  $("sysK").value=""; slipNo=genSlipNo(); render();
+}
+
+function slipText(){
+  const c=calc(); if(!c.n) return "Kupon pusty";
+  return [`${c.isSys?`KUPON SYSTEM ${c.k}/${c.n}`:"KUPON AKO"} nr ${slipNo}`,
+    ...c.sel.map((o,j)=>{const i=picks[o.id];return `${j+1}. ${o.home} – ${o.away} [${MK[i]}] @ ${o.odds[i].toFixed(2)} (szansa ${pct(c.ps[j])})`}),
+    `Kurs łączny: ${c.total.toFixed(2)}`,`Stawka: ${zl(c.stake)}`,`${c.isSys?"Maks. wypłata":"Do wypłaty"}: ${zl(c.maxNet)}`,
+    `Szansa ${c.isSys?"na jakąkolwiek wygraną":"trafienia"}: ${pct(c.pAny)}`].join("\n");
+}
+
+// ================= ZDARZENIA =================
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-id],[data-del],[data-unpick],[data-detail],#closeDetail"); if(!t) return;
+  if(t.id==="closeDetail"){detailId=null;renderDetail();renderOffer();return}
+  if(t.dataset.detail){detailId=+t.dataset.detail;renderDetail();renderOffer();$("detail").scrollIntoView({behavior:"smooth"});return}
+  if(t.dataset.del){const id=+t.dataset.del;offer=offer.filter(o=>o.id!==id);delete picks[id];if(detailId===id){detailId=null;renderDetail()}render();return}
+  if(t.dataset.unpick){delete picks[+t.dataset.unpick];render();return}
+  if(t.dataset.id){const id=+t.dataset.id,i=+t.dataset.i;picks[id]===i?delete picks[id]:picks[id]=i;render()}
+});
+$("detail").addEventListener("input",e=>{
+  const o=offer.find(x=>x.id===detailId); if(!o) return; const t=e.target;
+  if(t.dataset.link){
+    o.links=o.links||{}; const v=t.value.trim();
+    const host={sts:/^https:\/\/(www\.)?sts\.pl\//,betclic:/^https:\/\/(www\.)?betclic\.pl\//,superbet:/^https:\/\/(www\.)?superbet\.pl\//}[t.dataset.link];
+    t.style.borderColor = v && !host.test(v) ? "#ef4444" : "";
+    o.links[t.dataset.link] = host.test(v) ? v : "";
+    renderOffer(); renderSlip(); return;
+  }
+  if(t.dataset.odd!==undefined){
+    const i=+t.dataset.odd, v=parseFloat(t.value); o.odds[i]=v>1?v:null;
+    if(i<=2){ dcOdds(o).forEach((k,j)=>{o.odds[3+j]=k; const inp=$("detail").querySelector(`[data-odd="${3+j}"]`); if(inp) inp.value=k||"";}); }
+  } else if(t.dataset.s){
+    const tgt=o.stats[t.dataset.s], k=t.dataset.k;
+    tgt[k]=k==="form"?t.value:(parseFloat(t.value)||0);
+  } else return;
+  for(const id in picks){const p=offer.find(x=>x.id==id); if(p&&!(p.odds[picks[id]]>1)) delete picks[id];}
+  render();
+});
+$("gen").onclick=generate;
+$("reroll").onclick=()=>loadReal();
+$("clear").onclick=()=>{picks={};render()};
+$("stake").oninput=renderSlip; $("tax").onchange=renderSlip; $("sysK").onchange=renderSlip;
+$("wModel").oninput=()=>{$("wLbl").textContent=$("wModel").value+"%";render()};
+["m1x2","mDC","mGoals","mBTTS"].forEach(id=>$(id).onchange=()=>{renderOffer();renderValue()});
+["vFilter","vTax"].forEach(id=>$(id).onchange=renderValue); $("vMinP").oninput=renderValue;
+$("copy").onclick=async()=>{try{await navigator.clipboard.writeText(slipText());$("copy").textContent="Skopiowano ✓";setTimeout(()=>$("copy").textContent="Kopiuj jako tekst",1500)}catch{prompt("Skopiuj:",slipText())}};
+$("add").onclick=()=>{
+  const h=$("aHome").value.trim(), a=$("aAway").value.trim();
+  const v=id=>{const x=parseFloat($(id).value);return x>1?r2(x):null};
+  const odds=Array(NM).fill(null);
+  [["a1",0],["aX",1],["a2",2],["aO",8],["aU",9],["aBY",12],["aBN",13]].forEach(([id,i])=>odds[i]=v(id));
+  if(!h||!a||!(odds[0]&&odds[1]&&odds[2])){alert("Podaj obie drużyny i kursy 1X2 > 1.00");return}
+  if((odds[8]==null)!==(odds[9]==null)||(odds[12]==null)!==(odds[13]==null)){alert("Kursy na gole i BTTS podaj w parach (oba albo żaden).");return}
+  const d=new Date(Date.now()+864e5); d.setHours(20,0,0,0);
+  const o={id:nextId++,home:h,away:a,league:$("aLeague").value.trim()||"Inne",date:d,odds,stats:neutralStats()};
+  dcOdds(o).forEach((k,i)=>o.odds[3+i]=k);
+  offer.push(o); ["aHome","aAway","aO","aU","aBY","aBN"].forEach(id=>$(id).value="");
+  detailId=o.id; renderDetail(); render();
+};
+
+renderHead(); render(); loadReal();
+</script>
+</body>
+</html>
