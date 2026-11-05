@@ -85,102 +85,144 @@
   .pl a.go{background:#243244;color:var(--txt);text-decoration:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;white-space:nowrap}
   .pl .n{width:20px;height:20px;border-radius:50%;background:#243244;display:grid;place-items:center;font-size:11px}
   .pl.done{opacity:.45}
+
+  /* ---- uproszczony wygląd ---- */
+  body{font-size:14px}
+  header{display:flex;align-items:baseline;gap:12px;padding:14px 24px}
+  header .tag{color:var(--mut);font-size:13px}
+  main{gap:16px;padding:16px 24px}
+  .panel{padding:14px;margin-bottom:14px;border-radius:14px}
+  aside .panel{margin-bottom:12px}
+  .slip{margin-bottom:12px}
+  .tbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .seg{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  label.inl{flex-direction:row;align-items:center;gap:6px}
+  button.sm{padding:6px 10px;font-size:13px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  #lgPick label.chk{padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:#111b26;color:var(--txt);font-size:13px;cursor:pointer;user-select:none}
+  #lgPick label.chk input{display:none}
+  #lgPick label.chk:has(input:checked){background:var(--acc);border-color:var(--acc);color:#04210f;font-weight:600}
+  #lgPick label.chk:has(input:checked) .league{color:#04210f;opacity:.7}
+  .status{color:var(--mut);font-size:12px;margin:10px 0 0}
+  details.more summary,details.fold summary{cursor:pointer;color:var(--mut);font-size:13px;list-style:none;user-select:none}
+  details.more summary::before,details.fold summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+  details[open].more summary::before,details[open].fold summary::before{transform:rotate(90deg)}
+  details.fold summary{color:var(--txt);font-weight:600;font-size:14px}
+  table.offer td{padding:9px 5px}
+  table.offer td.odd{min-width:52px}
+  .slipctl .actions{margin-top:10px}
+  main>div,main>aside{min-width:0}
+  #dayPick{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+  #dayPick .chip{flex:0 0 auto}
 </style>
 </head>
 <body>
 <header>
-  <h1>🎟️ Generator kuponów bukmacherskich</h1>
-  <p>Tylko prawdziwe mecze (dane ESPN): forma, wyniki u siebie / na wyjeździe, stadion, tabela, odpoczynek, H2H, potwierdzone składy i newsy. Kontuzje uzupełniasz ręcznie. Narzędzie poglądowe — nie przyjmuje zakładów.</p>
+  <h1>🎟️ Generator kuponów</h1>
+  <span class="tag">prawdziwe mecze · analiza · kupony</span>
 </header>
 
 <main>
   <div>
+    <!-- MECZE: filtry -->
     <section class="panel">
-      <h2>Generator</h2>
-      <div class="row">
-        <label>Maks. zdarzeń <input id="gCount" type="number" min="1" max="20" value="4"></label>
-        <label>Min. kurs typu <input id="gMin" type="number" step="0.05" min="1.01" value="1.01"></label>
-        <label>Maks. kurs typu <input id="gMax" type="number" step="0.05" min="1.01" value="3.00"></label>
-        <label>Strategia
-          <select id="gTypes">
-            <option value="safe">🔒 najpewniejsze (najwyższa szansa)</option>
-            <option value="value">💎 value (dodatnia wartość wg modelu)</option>
-            <option value="all">🎲 losowo</option>
-          </select>
-        </label>
-        <label>Min. szansa typu % <input id="gMinP" type="number" step="5" min="0" max="99" value="0"></label>
+      <div class="tbar">
+        <div class="seg"><button class="sec sm" id="topBtn">⭐ Top 5 lig</button><button class="sec sm" id="cupsBtn">🏆 Puchary</button></div>
+        <div class="seg"><select id="dayRange" title="Zakres dni"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select>
+          <button class="sec sm" id="reroll" title="Pobierz najnowsze dane">↻</button></div>
       </div>
-      <div class="row">
-        <label title="Generator szuka kuponu z najwyższym kursem, którego szansa trafienia jest co najmniej taka">🎯 Docelowa szansa kuponu % <input id="gTargetP" type="number" step="5" min="0" max="99" value="0" style="width:120px"></label>
-        <label>lub cel kursu łącznego <input id="gTarget" type="number" step="0.5" min="0" value="0"></label>
-        <label>Waga modelu: <b id="wLbl">30%</b> <input id="wModel" type="range" min="0" max="100" value="30" style="width:150px;padding:0"></label>
+      <div id="lgPick" class="chips"></div>
+      <div id="dayPick" class="chips" style="margin-top:8px"></div>
+      <p class="status" id="dataStatus">⏳ Ładowanie…</p>
+    </section>
+
+    <!-- GENERATOR -->
+    <section class="panel">
+      <div class="tbar">
+        <div class="seg">
+          <label class="inl">Zdarzeń <input id="gCount" type="number" min="1" max="20" value="3" style="width:64px"></label>
+          <select id="gTypes">
+            <option value="safe">🔒 Najpewniejsze</option>
+            <option value="value">💎 Value</option>
+            <option value="all">🎲 Losowo</option>
+          </select>
+        </div>
         <button id="gen">Generuj kupon</button>
       </div>
-      <div class="row" style="margin-bottom:6px">
-        <span class="league" style="padding-bottom:9px">Rynki:</span>
-        <label class="chk"><input type="checkbox" id="m1x2" checked> 1X2</label>
-        <label class="chk"><input type="checkbox" id="mDC" checked> Podwójna szansa</label>
-        <label class="chk"><input type="checkbox" id="mGoals" checked> Gole (1.5 / 2.5 / 3.5)</label>
-        <label class="chk"><input type="checkbox" id="mBTTS" checked> Obie strzelą</label>
-      </div>
-      <h4>Jak realnie zwiększyć szansę trafienia</h4>
-      <div class="tips">
-        <div class="tip"><b>Mniej zdarzeń</b>Każdy typ mnoży ryzyko. 2 typy po 75% = 56%, 5 typów = 24%.</div>
-        <div class="tip"><b>Podwójna szansa (1X / X2)</b>Remis też wygrywa. Szansa rośnie zwykle z ~50% do ~75–85%, kurs spada.</div>
-        <div class="tip"><b>Bezpieczniejsze linie goli</b>„Powyżej 1.5” lub „poniżej 3.5” wchodzi zwykle w 65–80% meczów.</div>
-        <div class="tip"><b>Kupon systemowy</b>Np. 3 z 4: jeden nietrafiony typ nie przekreśla kuponu — dostajesz część wygranej.</div>
-        <div class="tip"><b>🎯 Docelowa szansa</b>Wpisz np. 60% — generator ułoży kupon z najwyższym kursem przy tej szansie.</div>
-      </div>
-      <p class="hint" style="margin-top:10px">Wyższa szansa zawsze oznacza niższy kurs — żadna metoda nie omija tej zależności. 🔵 kropka przy kursie = model widzi wartość (EV &gt; 0). 🔍 = wszystkie zmienne meczu.</p>
-    </section>
-
-    <section class="panel">
-      <h2>💎 Value bety</h2>
-      <p class="hint">Value bet to typ, w którym analiza ocenia szansę wyżej, niż wynika z kursu. <b>EV</b> = szansa × kurs − 1. W Polsce gra się za 88% stawki (podatek 12%), więc typ jest naprawdę na plus dopiero, gdy <b>EV po podatku</b> &gt; 0, czyli przewaga musi przekroczyć ok. 13,6%. <b>Min. kurs</b> = najniższy kurs, przy którym typ ma sens. Porównaj go z kursem u STS / Betclic / Superbet.</p>
-      <div class="row" style="margin-bottom:8px">
-        <label>Pokaż
-          <select id="vFilter">
-            <option value="pre">EV &gt; 0 (przed podatkiem)</option>
-            <option value="post">EV po podatku &gt; 0</option>
-            <option value="all">wszystkie typy (ranking)</option>
-          </select>
-        </label>
-        <label>Min. szansa % <input id="vMinP" type="number" min="0" max="99" step="5" value="30"></label>
-        <label class="chk"><input type="checkbox" id="vTax" checked> Licz z podatkiem PL</label>
-      </div>
-      <div class="scroll"><table>
-        <thead><tr><th>Mecz</th><th>Typ</th><th class="c">Kurs</th><th class="c">Szansa</th><th class="c">Kurs uczciwy</th><th class="c">Min. kurs</th><th class="c">EV</th><th class="c">EV po podatku</th><th class="c">Rynek vs model</th><th></th></tr></thead>
-        <tbody id="valueList"></tbody>
-      </table></div>
-      <p class="hint" style="margin-top:8px">⚠️ Value istnieje tylko <i>według modelu</i>. Model nie był testowany na historii i nie zna kontuzji, jeśli ich nie wpiszesz. Duże EV oznacza zwykle, że model czegoś nie wie, a nie że bukmacher się pomylił. Wiarygodność rośnie, gdy kilku polskich bukmacherów daje kurs wyższy niż „Min. kurs”.</p>
-    </section>
-
-    <section class="panel">
-      <h2>📊 Co najczęściej wchodzi</h2>
-      <p class="hint">Przybliżone średnie z czołowych lig europejskich (wieloletnie dane; różnią się między ligami i sezonami) oraz średnia szansa w bieżącej ofercie według analizy.</p>
-      <div class="scroll"><table>
-        <thead><tr><th>Typ</th><th class="c">Historycznie wchodzi</th><th class="c">Typowy kurs</th><th class="c">Średnio w ofercie</th><th>Uwagi</th></tr></thead>
-        <tbody id="baseRates"></tbody>
-      </table></div>
-      <h4>Co wynika z badań</h4>
-      <div class="tips">
-        <div class="tip"><b>Faworyci tracą mniej</b>Efekt „faworyt–outsider”: na typach z wysokim kursem (outsiderach) gracze tracą procentowo najwięcej, na mocnych faworytach najmniej. Ale w badaniach żadna strategia oparta tylko na kursach nie dawała trwałego zysku.</div>
-        <div class="tip"><b>Najczęściej ≠ najopłacalniej</b>„Powyżej 1.5” czy podwójna szansa wchodzą najczęściej, ale bukmacher wycenia to w kursie. Liczy się, czy kurs jest wyższy od kursu uczciwego (🔵 value), a nie sama częstotliwość.</div>
-        <div class="tip"><b>Porównuj kursy</b>Ten sam typ u różnych bukmacherów ma różne kursy. Wybór najwyższego realnie poprawia wynik — dlatego przy meczach są linki do STS, Betclic i Superbet.</div>
-      </div>
+      <details class="more">
+        <summary>Więcej opcji</summary>
+        <div class="row" style="margin-top:12px">
+          <label>Min. kurs typu <input id="gMin" type="number" step="0.05" min="1.01" value="1.01"></label>
+          <label>Maks. kurs typu <input id="gMax" type="number" step="0.05" min="1.01" value="3.00"></label>
+          <label>Min. szansa typu % <input id="gMinP" type="number" step="5" min="0" max="99" value="0"></label>
+          <label title="Najwyższy kurs przy szansie co najmniej takiej">🎯 Szansa kuponu ≥ % <input id="gTargetP" type="number" step="5" min="0" max="99" value="0"></label>
+          <label>Cel kursu łącznego <input id="gTarget" type="number" step="0.5" min="0" value="0"></label>
+        </div>
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="m1x2" checked> 1X2</label>
+          <label class="chk"><input type="checkbox" id="mDC" checked> Podwójna szansa</label>
+          <label class="chk"><input type="checkbox" id="mGoals" checked> Gole</label>
+          <label class="chk"><input type="checkbox" id="mBTTS" checked> Obie strzelą</label>
+          <label>Waga modelu <b id="wLbl">30%</b> <input id="wModel" type="range" min="0" max="100" value="30" style="width:140px;padding:0"></label>
+        </div>
+        <p class="hint">Wyższa szansa = niższy kurs. Najbezpieczniej: mało zdarzeń, podwójna szansa, „powyżej 1.5”, kupon systemowy.</p>
+      </details>
     </section>
 
     <section class="panel" id="detail" style="display:none"></section>
 
+    <!-- OFERTA -->
     <section class="panel">
-      <h2>Oferta</h2>
-      <h4 style="margin-top:0">Ligi</h4>
-      <div class="row" id="lgPick" style="gap:4px 14px;margin-bottom:8px"></div>
-      <div class="row" style="margin:-2px 0 8px"><button class="sec" id="cupsBtn">🏆 Europejskie puchary</button><button class="sec" id="topBtn">⭐ Top 5 lig</button></div>
-      <div class="row" style="margin:6px 0 6px;align-items:center"><h4 style="margin:0">Dni</h4>
-        <label style="flex-direction:row;align-items:center;gap:6px">zakres <select id="dayRange"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select></label>
-        <label class="chk" style="padding:0"><input type="checkbox" id="autoRef" checked> auto-odświeżanie co 10 min</label></div>
-      <div class="row" id="dayPick" style="gap:6px;margin-bottom:14px"></div>
+      <div class="tbar" style="margin-bottom:6px">
+        <h2 style="margin:0">Mecze</h2>
+        <label class="chk" style="padding:0"><input type="checkbox" id="allMk"> wszystkie rynki</label>
+      </div>
+      <div class="scroll">
+      <table class="offer">
+        <thead id="offerHead"></thead>
+        <tbody id="offer"></tbody>
+      </table>
+      </div>
+      <p class="hint" style="margin:8px 0 0">Kliknij kurs, aby dodać go do kuponu. 🔵 = model widzi wartość · 🔍 = pełna analiza meczu.</p>
+    </section>
+
+    <!-- SEKCJE ZWIJANE -->
+    <details class="panel fold">
+      <summary>💎 Value bety</summary>
+      <p class="hint" style="margin-top:12px">Typy, w których analiza ocenia szansę wyżej niż kurs. Przez podatek 12% typ jest na plus dopiero przy <b>EV po podatku</b> &gt; 0. <b>Min. kurs</b> = najniższy kurs, przy którym warto stawiać.</p>
+      <div class="row" style="margin-bottom:8px">
+        <label>Pokaż <select id="vFilter"><option value="pre">EV &gt; 0</option><option value="post">EV po podatku &gt; 0</option><option value="all">wszystkie (ranking)</option></select></label>
+        <label>Min. szansa % <input id="vMinP" type="number" min="0" max="99" step="5" value="30"></label>
+        <label class="chk"><input type="checkbox" id="vTax" checked> z podatkiem PL</label>
+      </div>
+      <div class="scroll"><table>
+        <thead><tr><th>Mecz</th><th>Typ</th><th class="c">Kurs</th><th class="c">Szansa</th><th class="c">Kurs uczciwy</th><th class="c">Min. kurs</th><th class="c">EV</th><th class="c">EV po podatku</th><th class="c">Rynek / model</th><th></th></tr></thead>
+        <tbody id="valueList"></tbody>
+      </table></div>
+      <p class="hint" style="margin-top:8px">Value istnieje tylko według modelu, który nie był testowany na historii. Duże EV zwykle oznacza, że model czegoś nie wie.</p>
+    </details>
+
+    <details class="panel fold">
+      <summary>📊 Co najczęściej wchodzi</summary>
+      <div class="scroll" style="margin-top:12px"><table>
+        <thead><tr><th>Typ</th><th class="c">Historycznie</th><th class="c">Typowy kurs</th><th class="c">W ofercie</th><th>Uwagi</th></tr></thead>
+        <tbody id="baseRates"></tbody>
+      </table></div>
+      <p class="hint" style="margin-top:8px">Średnie z czołowych lig europejskich (przybliżone). Na faworytach traci się procentowo najmniej, na outsiderach najwięcej — ale żadna strategia oparta tylko na kursach nie dawała w badaniach trwałego zysku.</p>
+    </details>
+
+    <details class="panel fold">
+      <summary>⚙️ Dane i ustawienia</summary>
+      <h4>Odświeżanie</h4>
+      <label class="chk" style="padding:0"><input type="checkbox" id="autoRef" checked> automatycznie co 10 min (nowe mecze, kursy, składy)</label>
+      <h4>API-Football — kontuzje, Ekstraklasa, kursy polskich bukmacherów</h4>
+      <div class="row" style="margin-bottom:6px">
+        <input id="afKey" type="password" placeholder="klucz z dashboard.api-football.com" style="width:280px" autocomplete="off">
+        <button class="sec" id="afSave">Zapisz i pobierz</button>
+        <button class="sec" id="afDel">Usuń</button>
+      </div>
+      <p class="hint" id="afStatus">Opcjonalnie. Klucz zostaje tylko w tej przeglądarce. <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">Darmowe konto</a> — 100 zapytań/dzień.</p>
+      <h4>Dodaj mecz ręcznie</h4>
       <div class="row">
         <label>Gospodarz <input id="aHome" placeholder="np. Legia" style="width:120px"></label>
         <label>Gość <input id="aAway" placeholder="np. Lech" style="width:120px"></label>
@@ -193,42 +235,26 @@
         <label>BTTS T <input id="aBY" class="sm" type="number" step="0.01" placeholder="opc."></label>
         <label>BTTS N <input id="aBN" class="sm" type="number" step="0.01" placeholder="opc."></label>
         <button class="sec" id="add">+ Dodaj</button>
-        <button class="sec" id="reroll">↻ Odśwież dane</button>
       </div>
-      <p class="hint" id="dataStatus">⏳ Ładowanie…</p>
-      <div class="row" style="margin-bottom:6px">
-        <label>🔑 Klucz API-Football (opcjonalnie) <input id="afKey" type="password" placeholder="wklej klucz z dashboard.api-football.com" style="width:300px" autocomplete="off"></label>
-        <button class="sec" id="afSave">Zapisz i pobierz</button>
-        <button class="sec" id="afDel">Usuń klucz</button>
-      </div>
-      <p class="hint" id="afStatus">Z kluczem API-Football strona doda kontuzje i zawieszenia, Ekstraklasę oraz kursy polskich bukmacherów (na żądanie). Klucz zostaje tylko w tej przeglądarce (localStorage) — nie trafia do repozytorium. Darmowe konto: <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">rejestracja</a>, 100 zapytań/dzień.</p><p class="hint">Mecze: Premier League, LaLiga, Serie A, Bundesliga z ESPN; Ekstraklasa — z kluczem API-Football (albo dodaj ręcznie). Kursy pochodzą od zagranicznych bukmacherów przez ESPN (np. bet365, DraftKings) i są orientacyjne — sprawdź aktualne u STS / Betclic / Superbet i wpisz w 🔍.</p>
-      <div class="scroll">
-      <table>
-        <thead id="offerHead"></thead>
-        <tbody id="offer"></tbody>
-      </table>
-      </div>
-    </section>
+      <p class="hint">Dane: ESPN (terminarz, forma, tabela, składy). Kursy zagraniczne (bet365, DraftKings) są orientacyjne — sprawdź aktualne u STS / Betclic / Superbet.</p>
+    </details>
   </div>
 
   <aside><div class="sticky">
     <div class="slip" id="slip"></div>
-    <div class="panel" id="place" style="margin-top:16px;display:none"></div>
-    <div class="panel" style="margin-top:16px">
-      <div class="row" style="margin:0 0 8px">
-        <label>Stawka (zł) <input id="stake" type="number" min="2" step="1" value="10"></label>
-        <label>Typ kuponu
-          <select id="sysK"></select>
-        </label>
+    <div class="panel slipctl">
+      <div class="row" style="margin:0">
+        <label>Stawka (zł) <input id="stake" type="number" min="2" step="1" value="10" style="width:80px"></label>
+        <label>Typ kuponu <select id="sysK"></select></label>
         <label class="chk"><input id="tax" type="checkbox" checked> Podatek PL</label>
       </div>
       <div class="actions">
-        <button class="sec" id="clear">Wyczyść</button>
-        <button class="sec" id="copy">Kopiuj jako tekst</button>
-        <button class="sec" onclick="window.print()">Drukuj</button>
+        <button class="sec sm" id="clear">Wyczyść</button>
+        <button class="sec sm" id="copy">Kopiuj</button>
+        <button class="sec sm" onclick="window.print()">Drukuj</button>
       </div>
-      <p class="note">System „k z n”: stawka dzielona na wszystkie kombinacje po k typów; każda trafiona kombinacja płaci osobno. Podatek PL: 12% od stawki oraz 10% od wygranej powyżej 2280 zł. Dane w ofercie przykładowej są fikcyjne.</p>
     </div>
+    <div class="panel" id="place" style="display:none"></div>
   </div></aside>
 </main>
 
@@ -256,7 +282,8 @@ const MK  = ["1","X","2","1X (gosp. lub remis)","12 (bez remisu)","X2 (remis lub
 const MKS = ["1","X","2","1X","12","X2","P 1.5","Pn 1.5","P 2.5","Pn 2.5","P 3.5","Pn 3.5","BTTS T","BTTS N"];
 const NM = MK.length;
 const GROUPS = [{i:[0,1,2],t:1,n:"1X2"},{i:[3,4,5],t:2,n:"podw. szansa"},{i:[6,7],t:1,n:"gole 1.5"},{i:[8,9],t:1,n:"gole 2.5"},{i:[10,11],t:1,n:"gole 3.5"},{i:[12,13],t:1,n:"BTTS"}];
-const SHOW = [0,1,2,3,4,5,6,8,9,11,12,13];   // kolumny w tabeli (rzadko przydatne Pn 1.5 i P 3.5 tylko w panelu 🔍)
+const SHOW_ALL = [0,1,2,3,4,5,6,8,9,11,12,13];   // rynki dostępne w tabeli (Pn 1.5 i P 3.5 tylko w 🔍)
+let SHOW = [0,1,2];
 const SEP = new Set([3,6,12]);
 const MARGIN = 1.065;
 
@@ -407,7 +434,7 @@ function analyze(o){
 }
 function allowed(){
   const a=[...($("m1x2").checked?[0,1,2]:[]),...($("mDC").checked?[3,4,5]:[]),...($("mGoals").checked?[6,7,8,9,10,11]:[]),...($("mBTTS").checked?[12,13]:[])];
-  return a.filter(i=>SHOW.includes(i));
+  return a.filter(i=>SHOW_ALL.includes(i));
 }
 function bestPick(a,idx){let b=-1;idx.forEach(i=>{if(a.fin[i]!=null&&(b<0||a.fin[i]>a.fin[b]))b=i});return b}
 function confColor(p){return p>=0.7?"#22c55e":p>=0.55?"#84cc16":p>=0.45?"#f59e0b":"#ef4444"}
@@ -418,7 +445,7 @@ const amToDec = s => { const v=parseFloat(String(s).replace("+","")); if(!isFini
 const ymd = d => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
 async function getJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
 async function pool(items,n,fn){ const out=[]; let i=0; await Promise.all(Array.from({length:n},async()=>{while(i<items.length){const k=i++; try{out[k]=await fn(items[k])}catch(e){out[k]=null}}})); return out; }
-const status = t => { $("dataStatus").innerHTML=t; };
+const status = t => { const el=$("dataStatus"); const short=t.replace(/ · dane:.*?(?= · pobrano| · auto|$)/,"").replace(/ · auto-odświeżanie co \d+ min/,""); el.innerHTML=short; el.title=t.replace(/<[^>]+>/g,""); };
 const teamCache={}, sumCache={};
 
 function parseOdds(c){
@@ -672,7 +699,7 @@ function renderFilters(){
     days.map((x,i)=>(x.n||i<2)?`<button class="chip ${selDays.has(x.k)?"on":""}" data-day="${x.k}" ${x.n?"":'disabled style="opacity:.35"'}>${lbl(x.d,i)}<small>${x.n}</small></button>`:"").join("");
 }
 function renderHead(){
-  $("offerHead").innerHTML=`<tr><th>Mecz</th><th>Data</th>${SHOW.map(i=>`<th class="c ${SEP.has(i)?"sep":""}">${MKS[i]}</th>`).join("")}<th class="sep">Najpewniejszy typ</th><th class="c">xG</th><th></th></tr>`;
+  $("offerHead").innerHTML=`<tr><th>Mecz</th><th>Data</th>${SHOW.map(i=>`<th class="c ${SEP.has(i)?"sep":""}">${MKS[i]}</th>`).join("")}<th class="sep">Najpewniejszy typ</th><th></th></tr>`;
 }
 function renderOffer(){
   const al=allowed();
@@ -682,13 +709,12 @@ function renderOffer(){
   $("offer").innerHTML=vis.map(o=>{
     const a=analyze(o), b=bestPick(a,al.length?al:[0,1,2]), pb=b>=0?a.fin[b]:0;
     return `<tr class="${detailId===o.id?"active":""}">
-      <td>${esc(o.home)} – ${esc(o.away)}<div class="league">${esc(o.league)}${o.venue?` · 🏟 ${esc(o.venue)}${o.city?", "+esc(o.city):""}`:""}${o.stats.lineup?" · ✅ składy":""}</div>${bookieLinks(o)}</td>
+      <td>${esc(o.home)} – ${esc(o.away)}<div class="league">${esc(o.league)}${o.stats.lineup?" · ✅ składy":""}</div></td>
       <td class="league">${fmtDate(o.date)}</td>
       ${SHOW.map(i=>{const k=o.odds[i], sep=SEP.has(i)?"sep":"";return k>1
         ?`<td class="odd ${sep} ${picks[o.id]===i?"sel":""} ${a.ev[i]>0?"val":""}" data-id="${o.id}" data-i="${i}" title="${MK[i]} · szansa ${pct(a.fin[i])} · EV ${(a.ev[i]*100).toFixed(1)}%">${k.toFixed(2)}</td>`
         :`<td class="na ${sep}">–</td>`}).join("")}
       <td class="conf sep">${b>=0?`<span class="bar"><i style="width:${pb*100}%;background:${confColor(pb)}"></i></span><b>${MKS[b]}</b> ${pct(pb)}`:"–"}</td>
-      <td class="c num league">${a.mo.lh.toFixed(2)}–${a.mo.la.toFixed(2)}</td>
       <td style="white-space:nowrap"><button class="mag" data-detail="${o.id}" title="Szczegóły analizy">🔍</button><button class="del" data-del="${o.id}" title="Usuń">✕</button></td>
     </tr>`;
   }).join("");
@@ -1010,6 +1036,8 @@ $("add").onclick=()=>{
   detailId=o.id; renderDetail(); render();
 };
 
+$("allMk").checked=localStorage.getItem("allMk")==="1"; SHOW=$("allMk").checked?SHOW_ALL:[0,1,2];
+$("allMk").onchange=()=>{SHOW=$("allMk").checked?SHOW_ALL:[0,1,2]; localStorage.setItem("allMk",$("allMk").checked?"1":"0"); renderHead(); renderOffer();};
 renderHead(); render(); loadReal();
 </script>
 </body>
