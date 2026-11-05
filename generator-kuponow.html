@@ -75,6 +75,9 @@
   .bk a.exact{outline:1px solid #fff}
   .bk a.sts{background:#0b7a3b}.bk a.betclic{background:#d0021b}.bk a.superbet{background:#e3051b}
   .slip .bk a{font-size:9px}
+  .chip{background:#111b26;border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:500}
+  .chip.on{background:var(--acc);color:#04210f;border-color:var(--acc);font-weight:700}
+  .chip small{opacity:.7;margin-left:4px}
   .bktabs{display:flex;gap:6px;margin-bottom:10px}
   .bktabs button{flex:1;padding:7px}
   .bktabs button.on{outline:2px solid #fff}
@@ -171,6 +174,10 @@
 
     <section class="panel">
       <h2>Oferta</h2>
+      <h4 style="margin-top:0">Ligi</h4>
+      <div class="row" id="lgPick" style="gap:4px 14px;margin-bottom:8px"></div>
+      <h4>Dni</h4>
+      <div class="row" id="dayPick" style="gap:6px;margin-bottom:14px"></div>
       <div class="row">
         <label>Gospodarz <input id="aHome" placeholder="np. Legia" style="width:120px"></label>
         <label>Gość <input id="aAway" placeholder="np. Lech" style="width:120px"></label>
@@ -226,7 +233,16 @@
 // ================= DANE (ESPN, bez klucza) =================
 const ESPN="https://site.api.espn.com/apis/site/v2/sports/soccer";
 const ESPN_ST="https://site.api.espn.com/apis/v2/sports/soccer";
-const LEAGUES={"eng.1":"Premier League","esp.1":"LaLiga","ita.1":"Serie A","ger.1":"Bundesliga"};
+const LEAGUES={"eng.1":"Premier League","esp.1":"LaLiga","ita.1":"Serie A","ger.1":"Bundesliga","fra.1":"Ligue 1",
+  "uefa.champions":"Liga Mistrzów","uefa.europa":"Liga Europy","uefa.europa.conf":"Liga Konferencji",
+  "ned.1":"Eredivisie","por.1":"Primeira Liga","eng.2":"Championship","tur.1":"Süper Lig","bel.1":"Jupiler Pro League","sco.1":"Premiership (Szkocja)",
+  "pol.1":"Ekstraklasa"};
+const AF_ONLY=new Set(["pol.1"]);   // tylko z kluczem API-Football
+const DEF_LG=["eng.1","esp.1","ita.1","ger.1","fra.1","uefa.champions"];
+let selLeagues=JSON.parse(localStorage.getItem("selLeagues")||"null")||DEF_LG.slice();
+let selDays=new Set(), loadedLg=new Set(), loading=false;
+const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function visible(){ return offer.filter(o=>(!o.lg||selLeagues.includes(o.lg)) && (!selDays.size||selDays.has(dayKey(o.date)))); }
 const DAYS=7;
 // Rynki (indeks w o.odds)
 const MK  = ["1","X","2","1X (gosp. lub remis)","12 (bez remisu)","X2 (remis lub gość)","Powyżej 1.5 gola","Poniżej 1.5 gola","Powyżej 2.5 gola","Poniżej 2.5 gola","Powyżej 3.5 gola","Poniżej 3.5 gola","Obie strzelą: tak","Obie strzelą: nie"];
@@ -246,7 +262,8 @@ const BOOKIES = [
     "Premier League":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/anglia/premier-league/1/1/17",
     "LaLiga":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/hiszpania/laliga/1/31/8",
     "Serie A":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/wlochy/serie-a/1/30/23",
-    "Bundesliga":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/niemcy/bundesliga/1/29/35"}},
+    "Bundesliga":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/niemcy/bundesliga/1/29/35",
+    "Ligue 1":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/francja/ligue-1/1/6/34"}},
   {key:"betclic", name:"Betclic", short:"BC", home:"https://www.betclic.pl/", leagues:{
     "Ekstraklasa":"https://www.betclic.pl/pilka-nozna-sfootball/ekstraklasa-c221",
     "Premier League":"https://www.betclic.pl/pilka-nozna-sfootball/premier-league-c3",
@@ -285,8 +302,8 @@ const BASE = [
 ];
 function renderBase(){
   $("baseRates").innerHTML = BASE.map(b=>{
-    const vals = offer.map(o=>analyze(o)).map(a=>a.fin[b.i]).filter(x=>x!=null);
-    const odds = offer.map(o=>o.odds[b.i]).filter(x=>x>1).sort((a,b)=>a-b);
+    const vals = visible().map(o=>analyze(o)).map(a=>a.fin[b.i]).filter(x=>x!=null);
+    const odds = visible().map(o=>o.odds[b.i]).filter(x=>x>1).sort((a,b)=>a-b);
     const avg = vals.length ? vals.reduce((a,c)=>a+c,0)/vals.length : null;
     const med = odds.length ? odds[odds.length>>1] : null;
     return `<tr><td>${MK[b.i]}</td><td class="c"><b>${b.hist}</b></td><td class="c num">${med?med.toFixed(2):"–"}</td>
@@ -454,21 +471,26 @@ async function loadSummary(o){
     }
   }catch(e){}
 }
-async function loadReal(){
-  offer=[];picks={};detailId=null;renderDetail();render();
-  status("⏳ Pobieram terminarz z ESPN…");
+async function loadReal(reset=true){
+  if(loading) return; loading=true;
+  const want=selLeagues.filter(lg=>LEAGUES[lg]&&!AF_ONLY.has(lg));
+  if(reset){ offer=offer.filter(o=>o.manual); picks={}; detailId=null; loadedLg.clear(); renderDetail(); render(); }
+  const lgs=want.filter(lg=>!loadedLg.has(lg));
+  if(!lgs.length){ loading=false; render(); if(afKey()&&selLeagues.some(l=>AF_ONLY.has(l))&&!offer.some(o=>o.afOnly)) afEnrich(); else if(!want.length) status("Zaznacz przynajmniej jedną ligę."); return; }
+  status(`⏳ Pobieram terminarz z ESPN: ${lgs.map(l=>LEAGUES[l]).join(", ")}…`);
   const now=new Date(), days=[...Array(DAYS).keys()].map(i=>ymd(new Date(now.getTime()+i*864e5)));
-  const jobs=[]; Object.keys(LEAGUES).forEach(lg=>days.forEach(d=>jobs.push({lg,d})));
+  const jobs=[]; lgs.forEach(lg=>days.forEach(d=>jobs.push({lg,d})));
   const sbs=await pool(jobs,8,j=>getJSON(`${ESPN}/${j.lg}/scoreboard?dates=${j.d}`).then(r=>({lg:j.lg,r})));
-  const seen=new Set(), raw=[];
+  const seen=new Set(offer.map(o=>o.espnId).filter(Boolean)), raw=[];
   sbs.filter(Boolean).forEach(({lg,r})=>(r.events||[]).forEach(e=>{
     if(seen.has(e.id)) return; seen.add(e.id);
     const c=e.competitions[0]; if(c.status?.type?.state!=="pre") return;
     const H=c.competitors.find(x=>x.homeAway==="home"), A=c.competitors.find(x=>x.homeAway==="away"); if(H&&A) raw.push({lg,e,c,H,A});
   }));
-  if(!raw.length){status("⚠️ Nie udało się pobrać meczów (brak połączenia z ESPN albo brak spotkań w najbliższych dniach). Spróbuj „Odśwież dane”.");return}
+  lgs.forEach(l=>loadedLg.add(l));
+  if(!raw.length){ loading=false; status(offer.length?`✅ ${visible().length} meczów · w nowo dodanych ligach brak spotkań w najbliższych ${DAYS} dniach`:"⚠️ Nie udało się pobrać meczów (brak połączenia z ESPN albo brak spotkań w najbliższych dniach). Spróbuj „Odśwież dane”."); render(); if(pendingLg()) return loadReal(false); return; }
   status(`⏳ Znaleziono ${raw.length} meczów. Pobieram tabele, wyniki drużyn, H2H i składy…`);
-  const stl={}; await pool(Object.keys(LEAGUES),4,async lg=>{try{stl[lg]=await standings(lg)}catch{stl[lg]={map:{},n:20}}});
+  const stl={}; await pool(lgs,4,async lg=>{try{stl[lg]=await standings(lg)}catch{stl[lg]={map:{},n:20}}});
   let done=0;
   const built=await pool(raw,6,async m=>{
     const [gh,ga]=await Promise.all([teamGames(m.lg,m.H.team.id),teamGames(m.lg,m.A.team.id)]);
@@ -481,16 +503,19 @@ async function loadReal(){
     status(`⏳ Analizuję mecze… ${++done}/${raw.length}`);
     return o;
   });
-  offer=built.filter(Boolean).sort((a,b)=>a.date-b.date);
-  const noOdds=offer.filter(o=>!o.odds[0]).length, lus=offer.filter(o=>o.stats.lineup).length;
-  status(`✅ ${offer.length} prawdziwych meczów z najbliższych ${DAYS} dni · dane: ESPN · kursy: ${offer.find(o=>o.provider)?.provider||"brak"}${noOdds?` · ${noOdds} bez kursów (wpisz w 🔍)`:""} · potwierdzone składy: ${lus} · pobrano ${new Date().toLocaleTimeString("pl-PL")}`);
+  offer=offer.concat(built.filter(Boolean)).sort((a,b)=>a.date-b.date);
+  loading=false;
+  const noOdds=offer.filter(o=>o.real&&!o.odds[0]).length, lus=offer.filter(o=>o.stats.lineup).length;
+  status(`✅ ${offer.filter(o=>o.real).length} prawdziwych meczów z najbliższych ${DAYS} dni · dane: ESPN · kursy: ${offer.find(o=>o.provider)?.provider||"brak"}${noOdds?` · ${noOdds} bez kursów (wpisz w 🔍)`:""} · potwierdzone składy: ${lus} · pobrano ${new Date().toLocaleTimeString("pl-PL")}`);
   render();
+  if(pendingLg()) return loadReal(false);   // ligi zaznaczone w trakcie ładowania
   if(afKey()) afEnrich();
 }
+const pendingLg=()=>selLeagues.some(l=>LEAGUES[l]&&!AF_ONLY.has(l)&&!loadedLg.has(l));
 
 // ================= API-FOOTBALL (opcjonalnie, klucz użytkownika) =================
 const AF="https://v3.football.api-sports.io";
-const AF_LG={39:"eng.1",140:"esp.1",135:"ita.1",78:"ger.1",106:"pol.1"};
+const AF_LG={39:"eng.1",140:"esp.1",135:"ita.1",78:"ger.1",61:"fra.1",2:"uefa.champions",3:"uefa.europa",848:"uefa.europa.conf",88:"ned.1",94:"por.1",40:"eng.2",203:"tur.1",144:"bel.1",179:"sco.1",106:"pol.1"};
 const afKey=()=>localStorage.getItem("afKey")||"";
 let afCalls=0, afInfo="";
 const afStatus=t=>{$("afStatus").innerHTML=t};
@@ -528,7 +553,7 @@ async function afEnrich(){
     const season=afSeason(), now=new Date(), from=isoDay(now), to=isoDay(new Date(now.getTime()+(DAYS-1)*864e5));
     afStatus(`⏳ API-Football (${afInfo}): pobieram terminarze…`);
     const fx=[]; let seasonErr="";
-    for(const lid of Object.keys(AF_LG)){
+    for(const lid of Object.keys(AF_LG).filter(id=>selLeagues.includes(AF_LG[id]))){
       try{ const d=await af(`/fixtures?league=${lid}&season=${season}&from=${from}&to=${to}`); fx.push(...(d.response||[])); }
       catch(e){ seasonErr=e.message; }
     }
@@ -606,12 +631,25 @@ function afBox(o){
 }
 
 // ================= RENDER =================
+function renderFilters(){
+  $("lgPick").innerHTML=Object.entries(LEAGUES).map(([k,n])=>{
+    const cnt=offer.filter(o=>o.lg===k).length, need=AF_ONLY.has(k)&&!afKey();
+    return `<label class="chk" title="${need?"wymaga klucza API-Football":""}" style="${need?"opacity:.5":""}"><input type="checkbox" data-lg="${k}" ${selLeagues.includes(k)?"checked":""} ${need?"disabled":""}> ${n}${need?" 🔑":""}${cnt&&selLeagues.includes(k)?` <span class="league">(${cnt})</span>`:""}</label>`}).join("");
+  const base=offer.filter(o=>!o.lg||selLeagues.includes(o.lg)), now=new Date();
+  const days=[...Array(DAYS).keys()].map(i=>{const d=new Date(now.getTime()+i*864e5);return {k:dayKey(d),d,n:base.filter(o=>dayKey(o.date)===dayKey(d)).length}});
+  const lbl=(d,i)=>i===0?"Dziś":i===1?"Jutro":d.toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"numeric"});
+  $("dayPick").innerHTML=`<button class="chip ${selDays.size?"":"on"}" data-day="all">Wszystkie<small>${base.length}</small></button>`+
+    days.map((x,i)=>`<button class="chip ${selDays.has(x.k)?"on":""}" data-day="${x.k}" ${x.n?"":'disabled style="opacity:.35"'}>${lbl(x.d,i)}<small>${x.n}</small></button>`).join("");
+}
 function renderHead(){
   $("offerHead").innerHTML=`<tr><th>Mecz</th><th>Data</th>${SHOW.map(i=>`<th class="c ${SEP.has(i)?"sep":""}">${MKS[i]}</th>`).join("")}<th class="sep">Najpewniejszy typ</th><th class="c">xG</th><th></th></tr>`;
 }
 function renderOffer(){
   const al=allowed();
-  $("offer").innerHTML=offer.map(o=>{
+  renderFilters();
+  const vis=visible();
+  if(!vis.length){$("offer").innerHTML=`<tr><td colspan="20" class="league" style="text-align:center;padding:16px">${offer.length?"Brak meczów dla wybranych lig i dni.":"Ładowanie…"}</td></tr>`;return}
+  $("offer").innerHTML=vis.map(o=>{
     const a=analyze(o), b=bestPick(a,al.length?al:[0,1,2]), pb=b>=0?a.fin[b]:0;
     return `<tr class="${detailId===o.id?"active":""}">
       <td>${esc(o.home)} – ${esc(o.away)}<div class="league">${esc(o.league)}${o.venue?` · 🏟 ${esc(o.venue)}${o.city?", "+esc(o.city):""}`:""}${o.stats.lineup?" · ✅ składy":""}</div>${bookieLinks(o)}</td>
@@ -765,7 +803,7 @@ function renderSlip(){
 function renderValue(){
   const mode=$("vFilter").value, minP=(parseFloat($("vMinP").value)||0)/100, taxF=$("vTax").checked?0.88:1;
   const al=allowed(), rows=[];
-  offer.forEach(o=>{ const a=analyze(o);
+  visible().forEach(o=>{ const a=analyze(o);
     al.forEach(i=>{ const k=o.odds[i], p=a.fin[i]; if(!(k>1)||p==null||p<minP) return;
       const ev=p*k-1, evT=p*k*taxF-1;
       if(mode==="pre"&&ev<=0) return; if(mode==="post"&&evT<=0) return;
@@ -813,7 +851,7 @@ function generate(){
   const mode=$("gTypes").value, target=parseFloat($("gTarget").value)||0;
   const minP=(parseFloat($("gMinP").value)||0)/100, targetP=(parseFloat($("gTargetP").value)||0)/100;
   const cands=[];
-  offer.forEach(o=>{
+  visible().forEach(o=>{
     const a=analyze(o);
     let idx=al.filter(i=>o.odds[i]>=min&&o.odds[i]<=max&&a.fin[i]!=null&&a.fin[i]>=minP);
     if(mode==="value") idx=idx.filter(i=>a.ev[i]>0);
@@ -864,7 +902,8 @@ function slipText(){
 
 // ================= ZDARZENIA =================
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-id],[data-del],[data-unpick],[data-detail],[data-afodds],[data-afh2h],[data-bk],[data-placed],#closeDetail"); if(!t) return;
+  const t=e.target.closest("[data-id],[data-del],[data-unpick],[data-detail],[data-afodds],[data-afh2h],[data-bk],[data-placed],[data-day],#closeDetail"); if(!t) return;
+  if(t.dataset.day){ const k=t.dataset.day; if(k==="all") selDays.clear(); else selDays.has(k)?selDays.delete(k):selDays.add(k); render(); return; }
   if(t.dataset.bk){placeBk=t.dataset.bk;renderPlace();return}
   if(t.dataset.placed){placeDone[t.dataset.placed]=true;setTimeout(renderPlace,0);return}
   if(t.dataset.afodds||t.dataset.afh2h){ const o=offer.find(x=>x.id==(t.dataset.afodds||t.dataset.afh2h)); if(!o) return;
@@ -896,7 +935,11 @@ $("detail").addEventListener("input",e=>{
   render();
 });
 $("gen").onclick=generate;
-$("reroll").onclick=()=>loadReal();
+$("reroll").onclick=()=>loadReal(true);
+document.addEventListener("change",e=>{ const lg=e.target.dataset?.lg; if(!lg) return;
+  selLeagues = e.target.checked ? [...new Set([...selLeagues,lg])] : selLeagues.filter(x=>x!==lg);
+  localStorage.setItem("selLeagues",JSON.stringify(selLeagues));
+  if(e.target.checked){ AF_ONLY.has(lg) ? afEnrich() : loadReal(false); } else render(); });
 $("afKey").value=afKey();
 $("afSave").onclick=()=>{const k=$("afKey").value.trim(); if(!k){alert("Wklej klucz API-Football.");return} localStorage.setItem("afKey",k); afEnrich();};
 $("afDel").onclick=()=>{localStorage.removeItem("afKey"); Object.keys(localStorage).filter(k=>k.startsWith("af:")).forEach(k=>localStorage.removeItem(k)); $("afKey").value=""; loadReal(); afStatus("Klucz usunięty z tej przeglądarki.");};
@@ -914,7 +957,7 @@ $("add").onclick=()=>{
   if(!h||!a||!(odds[0]&&odds[1]&&odds[2])){alert("Podaj obie drużyny i kursy 1X2 > 1.00");return}
   if((odds[8]==null)!==(odds[9]==null)||(odds[12]==null)!==(odds[13]==null)){alert("Kursy na gole i BTTS podaj w parach (oba albo żaden).");return}
   const d=new Date(Date.now()+864e5); d.setHours(20,0,0,0);
-  const o={id:nextId++,home:h,away:a,league:$("aLeague").value.trim()||"Inne",date:d,odds,stats:neutralStats()};
+  const o={id:nextId++,manual:true,home:h,away:a,league:$("aLeague").value.trim()||"Inne",date:d,odds,stats:neutralStats()};
   dcOdds(o).forEach((k,i)=>o.odds[3+i]=k);
   offer.push(o); ["aHome","aAway","aO","aU","aBY","aBN"].forEach(id=>$(id).value="");
   detailId=o.id; renderDetail(); render();
