@@ -178,7 +178,13 @@
         <button class="sec" id="add">+ Dodaj</button>
         <button class="sec" id="reroll">↻ Odśwież dane</button>
       </div>
-      <p class="hint" id="dataStatus">⏳ Ładowanie…</p><p class="hint">Mecze: Premier League, LaLiga, Serie A, Bundesliga (Ekstraklasy nie ma w darmowym źródle — możesz ją dodać ręcznie powyżej). Kursy pochodzą od zagranicznych bukmacherów przez ESPN (np. bet365, DraftKings) i są orientacyjne — sprawdź aktualne u STS / Betclic / Superbet i wpisz w 🔍.</p>
+      <p class="hint" id="dataStatus">⏳ Ładowanie…</p>
+      <div class="row" style="margin-bottom:6px">
+        <label>🔑 Klucz API-Football (opcjonalnie) <input id="afKey" type="password" placeholder="wklej klucz z dashboard.api-football.com" style="width:300px" autocomplete="off"></label>
+        <button class="sec" id="afSave">Zapisz i pobierz</button>
+        <button class="sec" id="afDel">Usuń klucz</button>
+      </div>
+      <p class="hint" id="afStatus">Z kluczem API-Football strona doda kontuzje i zawieszenia, Ekstraklasę oraz kursy polskich bukmacherów (na żądanie). Klucz zostaje tylko w tej przeglądarce (localStorage) — nie trafia do repozytorium. Darmowe konto: <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">rejestracja</a>, 100 zapytań/dzień.</p><p class="hint">Mecze: Premier League, LaLiga, Serie A, Bundesliga z ESPN; Ekstraklasa — z kluczem API-Football (albo dodaj ręcznie). Kursy pochodzą od zagranicznych bukmacherów przez ESPN (np. bet365, DraftKings) i są orientacyjne — sprawdź aktualne u STS / Betclic / Superbet i wpisz w 🔍.</p>
       <div class="scroll">
       <table>
         <thead id="offerHead"></thead>
@@ -330,9 +336,10 @@ function model(o){
   apply("Atut własnego boiska",vs?1.04:1.10,vs?0.97:0.92,vs?"reszta już w golach dom/wyjazd":"+10% gosp., −8% gość");
   const fh=formPts(H.form), fa=formPts(A.form), dF=fh-fa;
   apply("Forma (ost. mecze)",Math.exp(0.30*dF),Math.exp(-0.30*dF),`${Math.round(fh*100)}% vs ${Math.round(fa*100)}% pkt`);
-  const dP=(A.pos-H.pos)/Math.max(1,(o.stats.teams||18)-1);
+  const dP=clamp((A.pos-H.pos)/Math.max(9,(o.stats.teams||18)-1),-1,1);
   apply("Pozycja w tabeli",Math.exp(0.22*dP),Math.exp(-0.22*dP),`${H.pos}. vs ${A.pos}.`);
-  apply("Kontuzje / absencje",clamp(1-0.05*H.inj,0.7,1),clamp(1-0.05*A.inj,0.7,1),`${H.inj} vs ${A.inj} kluczowych`);
+  const ia=o.stats.injAuto, iw=ia?0.03:0.05;
+  apply(ia?"Kontuzje / zawieszenia (API-Football)":"Kontuzje / absencje",clamp(1-iw*H.inj,0.75,1),clamp(1-iw*A.inj,0.75,1),ia?`${H.inj} vs ${A.inj} wypada (−3% xG za zawodnika)`:`${H.inj} vs ${A.inj} kluczowych`);
   const lu=o.stats.lineup, rot=c=>c==null?1:clamp(1-0.02*Math.max(0,c-2),0.88,1);
   const hc=lu?.home?.changes, ac=lu?.away?.changes;
   apply("Skład (zmiany w XI vs poprz. mecz)",rot(hc),rot(ac),!lu?"skład jeszcze nieogłoszony":`${hc??"?"} vs ${ac??"?"} zmian`);
@@ -470,6 +477,124 @@ async function loadReal(){
   const noOdds=offer.filter(o=>!o.odds[0]).length, lus=offer.filter(o=>o.stats.lineup).length;
   status(`✅ ${offer.length} prawdziwych meczów z najbliższych ${DAYS} dni · dane: ESPN · kursy: ${offer.find(o=>o.provider)?.provider||"brak"}${noOdds?` · ${noOdds} bez kursów (wpisz w 🔍)`:""} · potwierdzone składy: ${lus} · pobrano ${new Date().toLocaleTimeString("pl-PL")}`);
   render();
+  if(afKey()) afEnrich();
+}
+
+// ================= API-FOOTBALL (opcjonalnie, klucz użytkownika) =================
+const AF="https://v3.football.api-sports.io";
+const AF_LG={39:"eng.1",140:"esp.1",135:"ita.1",78:"ger.1",106:"pol.1"};
+const afKey=()=>localStorage.getItem("afKey")||"";
+let afCalls=0, afInfo="";
+const afStatus=t=>{$("afStatus").innerHTML=t};
+async function af(path,ttlMin=180){
+  const ck="af:"+path, c=JSON.parse(localStorage.getItem(ck)||"null");
+  if(c&&Date.now()-c.t<ttlMin*6e4) return c.d;
+  const r=await fetch(AF+path,{headers:{"x-apisports-key":afKey()}}); afCalls++;
+  const d=await r.json();
+  const errs=d.errors?(Array.isArray(d.errors)?d.errors:Object.values(d.errors)):[];
+  if(errs.length) throw new Error(errs.join(" · "));
+  try{localStorage.setItem(ck,JSON.stringify({t:Date.now(),d}))}catch{}
+  return d;
+}
+const afSeason=()=>{const n=new Date();return n.getMonth()>=6?n.getFullYear():n.getFullYear()-1};
+const isoDay=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const normName=s=>String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
+  .replace(/\b(fc|cf|afc|sc|ac|as|ss|ssc|vfb|vfl|tsg|sv|rcd|cd|ud|club|calcio|de|la|hotspur|and|hove|albion)\b/g," ")
+  .replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>2);
+const sameTeam=(a,b)=>{const A=normName(a),B=normName(b);return A.some(x=>B.some(y=>x===y||(x.length>3&&y.length>3&&(x.startsWith(y)||y.startsWith(x)))))};
+function teamFromStanding(st,atHome,nTeams){
+  if(!st) return {...neutralTeam(),venueRec:"–",nVenue:0,last5:[]};
+  const v=atHome?st.home:st.away, a=st.all, K=3;
+  const per=(g,p)=>p?g/p:null, aGF=per(a.goals.for,a.played)??1.35, aGA=per(a.goals.against,a.played)??1.35;
+  const mix=(x,av,n)=>x==null?av:(x*n+av*K)/(n+K);
+  return {form:(st.form||"").slice(-5), gf:r2(mix(per(v.goals.for,v.played),aGF,v.played)), ga:r2(mix(per(v.goals.against,v.played),aGA,v.played)),
+    pos:st.rank, inj:0, rest:7, venueRec:`${v.win}-${v.draw}-${v.lose}`, nVenue:v.played, last5:[], stand:{rank:st.rank,pts:st.points,gf:a.goals.for,ga:a.goals.against}};
+}
+async function afEnrich(){
+  afCalls=0;
+  try{
+    afStatus("⏳ API-Football: sprawdzam konto…");
+    const st=await af("/status",0), acc=st.response||{};
+    const plan=acc.subscription?.plan||"?", used=acc.requests?.current, lim=acc.requests?.limit_day;
+    afInfo=`plan ${esc(plan)} · dziś ${used??"?"}/${lim??"?"} zapytań`;
+    const season=afSeason(), now=new Date(), from=isoDay(now), to=isoDay(new Date(now.getTime()+(DAYS-1)*864e5));
+    afStatus(`⏳ API-Football (${afInfo}): pobieram terminarze…`);
+    const fx=[]; let seasonErr="";
+    for(const lid of Object.keys(AF_LG)){
+      try{ const d=await af(`/fixtures?league=${lid}&season=${season}&from=${from}&to=${to}`); fx.push(...(d.response||[])); }
+      catch(e){ seasonErr=e.message; }
+    }
+    if(!fx.length) throw new Error(seasonErr||"brak meczów w API-Football dla bieżącego sezonu");
+    const pre=fx.filter(x=>["NS","TBD"].includes(x.fixture?.status?.short));
+    // Ekstraklasa: nowe mecze z tabelą (forma, dom/wyjazd)
+    const ek=pre.filter(x=>x.league?.id===106);
+    if(ek.length && !offer.some(o=>o.afOnly)){
+      let table=[]; try{ const sd=await af(`/standings?league=106&season=${season}`,360); table=sd.response?.[0]?.league?.standings?.[0]||[]; }catch{}
+      const byId=Object.fromEntries(table.map(t=>[t.team.id,t]));
+      ek.forEach(x=>{
+        const o={id:nextId++,afId:x.fixture.id,afOnly:true,real:true,lg:"pol.1",league:"Ekstraklasa",home:x.teams.home.name,away:x.teams.away.name,
+          homeAfId:x.teams.home.id,awayAfId:x.teams.away.id,date:new Date(x.fixture.date),venue:x.fixture.venue?.name||"",city:x.fixture.venue?.city||"",
+          odds:Array(NM).fill(null),news:[],provider:null,
+          stats:{home:teamFromStanding(byId[x.teams.home.id],true),away:teamFromStanding(byId[x.teams.away.id],false),h2h:{hw:0,d:0,aw:0},teams:table.length||18,venueSplit:!!table.length,lineup:null}};
+        offer.push(o);
+      });
+      offer.sort((a,b)=>a.date-b.date);
+    }
+    // dopasuj pozostałe mecze do meczów z ESPN
+    pre.filter(x=>x.league?.id!==106).forEach(x=>{
+      const t=new Date(x.fixture.date);
+      const o=offer.find(o=>!o.afOnly&&o.lg===AF_LG[x.league.id]&&Math.abs(o.date-t)<3*36e5&&sameTeam(o.home,x.teams.home.name)&&sameTeam(o.away,x.teams.away.name));
+      if(o){o.afId=x.fixture.id;o.homeAfId=x.teams.home.id;o.awayAfId=x.teams.away.id;}
+    });
+    // kontuzje i zawieszenia: po 20 meczów na zapytanie
+    const withAf=offer.filter(o=>o.afId), ids=withAf.map(o=>o.afId);
+    afStatus(`⏳ API-Football (${afInfo}): pobieram kontuzje dla ${ids.length} meczów…`);
+    const inj=[];
+    for(let i=0;i<ids.length;i+=20){ try{ const d=await af(`/injuries?ids=${ids.slice(i,i+20).join("-")}`,120); inj.push(...(d.response||[])); }catch(e){ console.warn("injuries",e); } }
+    withAf.forEach(o=>{
+      const mine=inj.filter(r=>r.fixture?.id===o.afId);
+      ["home","away"].forEach(side=>{
+        const tid=side==="home"?o.homeAfId:o.awayAfId, list=mine.filter(r=>r.team?.id===tid).map(r=>({name:r.player?.name,type:r.player?.type,reason:r.player?.reason}));
+        o.stats[side].injList=list; o.stats[side].inj=list.filter(p=>/missing/i.test(p.type||"")).length;
+      });
+      o.stats.injAuto=true;
+    });
+    // składy Ekstraklasy na ~90 min przed meczem
+    for(const o of offer.filter(o=>o.afOnly&&o.date-Date.now()<90*6e4&&o.date>Date.now())){
+      try{ const d=await af(`/fixtures/lineups?fixture=${o.afId}`,10); const L=d.response||[];
+        if(L.length===2){ const m=x=>({xi:(x.startXI||[]).map(p=>({id:p.player.id,name:p.player.name,pos:p.player.pos||""})),formation:x.formation,changes:null});
+          o.stats.lineup={home:m(L.find(x=>x.team.id===o.homeAfId)||L[0]),away:m(L.find(x=>x.team.id===o.awayAfId)||L[1])}; } }catch{}
+    }
+    const nInj=withAf.reduce((a,o)=>a+o.stats.home.inj+o.stats.away.inj,0);
+    afStatus(`✅ API-Football (${afInfo}; ta sesja: ${afCalls} zapyt.) · dopasowano ${withAf.length} meczów · ${nInj} zawodników wypada (kontuzje/zawieszenia) · Ekstraklasa: ${offer.filter(o=>o.afOnly).length} meczów. Kursy polskich bukmacherów i H2H pobierzesz w 🔍.`);
+  }catch(e){
+    afStatus(`⚠️ API-Football: ${esc(e.message)}${/season|plan/i.test(e.message)?" — darmowy plan nie obejmuje bieżącego sezonu; potrzebny płatny plan.":""} Strona działa dalej na danych ESPN.`);
+  }
+  renderDetail(); render();
+}
+async function afOdds(o){
+  const d=await af(`/odds?fixture=${o.afId}`,60), bms=d.response?.[0]?.bookmakers||[];
+  if(!bms.length) throw new Error("brak kursów dla tego meczu");
+  const get=(bm,name,val)=>{const b=(bm.bets||[]).find(x=>x.name===name);const v=b&&(b.values||[]).find(x=>String(x.value)===val);return v?parseFloat(v.odd):null};
+  o.afBooks=bms.map(bm=>({name:bm.name,o:[get(bm,"Match Winner","Home"),get(bm,"Match Winner","Draw"),get(bm,"Match Winner","Away"),get(bm,"Goals Over/Under","Over 2.5"),get(bm,"Goals Over/Under","Under 2.5"),get(bm,"Both Teams Score","Yes"),get(bm,"Both Teams Score","No")]}));
+  const pl=o.afBooks.filter(b=>/sts|betclic|superbet|fortuna|betfan|totalbet/i.test(b.name));
+  const src=(pl.find(b=>b.o[0])||o.afBooks.find(b=>b.o[0]));
+  if(src){ const idx=[0,1,2,8,9,12,13]; idx.forEach((i,k)=>{ if(src.o[k]>1) o.odds[i]=src.o[k]; }); dcOdds(o).forEach((k,i)=>o.odds[3+i]=k); o.provider=src.name; }
+}
+async function afH2H(o){
+  const d=await af(`/fixtures/headtohead?h2h=${o.homeAfId}-${o.awayAfId}&last=6`,720), h={hw:0,d:0,aw:0};
+  (d.response||[]).forEach(x=>{const g=x.goals||{}; if(g.home==null) return; const homeIsHome=x.teams.home.id===o.homeAfId;
+    const a=homeIsHome?g.home:g.away, b=homeIsHome?g.away:g.home; a>b?h.hw++:a<b?h.aw++:h.d++;});
+  o.stats.h2h=h;
+}
+function afBox(o){
+  if(!o.afId) return "";
+  const inj=side=>{const l=o.stats[side].injList||[];return l.length?l.map(p=>`<div>${/missing/i.test(p.type||"")?"❌":"❓"} ${esc(p.name)} <span class="league">— ${esc(p.reason||p.type||"")}</span></div>`).join(""):'<div class="league">brak zgłoszonych</div>'};
+  const books=o.afBooks?`<div class="scroll"><table><thead><tr><th>Bukmacher</th>${["1","X","2","P 2.5","Pn 2.5","BTTS T","BTTS N"].map(x=>`<th class="c">${x}</th>`).join("")}</tr></thead><tbody>${
+    o.afBooks.slice().sort((a,b)=>(/sts|betclic|superbet/i.test(b.name))-(/sts|betclic|superbet/i.test(a.name))).slice(0,12).map(b=>`<tr><td>${/sts|betclic|superbet/i.test(b.name)?"🇵🇱 ":""}${esc(b.name)}</td>${b.o.map((k,i)=>{const best=Math.max(...o.afBooks.map(x=>x.o[i]||0));return `<td class="c num ${k&&k===best?"pos":""}">${k?k.toFixed(2):"–"}</td>`}).join("")}</tr>`).join("")}</tbody></table></div><p class="hint">Zielony = najwyższy kurs. Do analizy użyto: <b>${esc(o.provider||"")}</b>.</p>`:"";
+  return `<h4>🩹 Kontuzje i zawieszenia (API-Football)</h4>
+    <div class="grid2"><div class="team"><b>${esc(o.home)}</b><div class="hint" style="margin:6px 0 0">${inj("home")}</div></div><div class="team"><b>${esc(o.away)}</b><div class="hint" style="margin:6px 0 0">${inj("away")}</div></div></div>
+    <div class="row" style="margin-top:10px"><button class="sec" data-afodds="${o.id}">💰 Porównaj kursy bukmacherów (1 zapytanie)</button>${o.afOnly?`<button class="sec" data-afh2h="${o.id}">⚔️ Pobierz H2H (1 zapytanie)</button>`:""}</div>${books}`;
 }
 
 // ================= RENDER =================
@@ -503,6 +628,7 @@ function teamExtra(o,side){
 function lineupBox(o){
   if(!o.real) return "";
   const lu=o.stats.lineup;
+  if(!lu&&o.afOnly) return `<h4>👥 Składy</h4><p class="hint">Jeszcze nieogłoszone — pobiorą się automatycznie po „Odśwież dane” na ok. 90 min przed meczem.</p>`;
   if(!lu) return `<h4>👥 Składy</h4><p class="hint">Jeszcze nieogłoszone — kluby podają je zwykle ok. godzinę przed meczem. Kliknij „Odśwież dane” bliżej startu, a model uwzględni zmiany w składzie.</p>`;
   const col=(side,name)=>{const x=lu[side];return `<div class="team"><b>${esc(name)}</b> <span class="league">${x.formation||""}${x.changes!=null?` · ${x.changes} zmian vs poprzedni mecz`:""}</span><div class="league" style="margin-top:6px;line-height:1.6">${x.xi.map(p=>`${esc(p.pos)} ${esc(p.name)}`).join(" · ")||"brak"}</div></div>`};
   return `<h4>👥 Potwierdzone składy</h4><div class="grid2">${col("home",o.home)}${col("away",o.away)}</div>`;
@@ -523,8 +649,9 @@ function renderDetail(){
     </div>${teamExtra(o,side)}</div>`};
   const h=o.stats.h2h, oddIn=i=>`<label>${MKS[i]} <input class="sm" type="number" step="0.01" data-odd="${i}" value="${o.odds[i]||""}" ${i>=3&&i<=5?'disabled title="liczone z 1X2"':""}></label>`;
   el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🔍 Analiza: ${esc(o.home)} – ${esc(o.away)}</h2><button class="sec" id="closeDetail">Zamknij</button></div>
-    ${o.real?`<p class="hint">🏟 ${esc(o.venue||"stadion nieznany")}${o.city?", "+esc(o.city):""} · ${fmtDate(o.date)}${o.neutral?" · teren neutralny":""} · <a href="https://www.espn.com/soccer/match/_/gameId/${o.espnId}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">mecz na ESPN</a></p>`:""}
+    ${o.real?`<p class="hint">🏟 ${esc(o.venue||"stadion nieznany")}${o.city?", "+esc(o.city):""} · ${fmtDate(o.date)}${o.neutral?" · teren neutralny":""}${o.espnId?` · <a href="https://www.espn.com/soccer/match/_/gameId/${o.espnId}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">mecz na ESPN</a>`:""}</p>`:""}
     ${lineupBox(o)}
+    ${afBox(o)}
     ${o.news?.length?`<h4>📰 Newsy drużyn (sprawdź kontuzje i absencje)</h4><ul class="hint" style="margin:0 0 6px;padding-left:18px">${o.news.map(n=>`<li>${n.u?`<a href="${esc(n.u)}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">${esc(n.t)}</a>`:esc(n.t)}</li>`).join("")}</ul>`:""}
     <h4>Zmienne wejściowe ${o.real?'<span class="league">(pobrane automatycznie — możesz poprawić)</span>':""}</h4>
     <div class="grid2">${teamBox("home",o.home)}${teamBox("away",o.away)}</div>
@@ -711,7 +838,10 @@ function slipText(){
 
 // ================= ZDARZENIA =================
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-id],[data-del],[data-unpick],[data-detail],#closeDetail"); if(!t) return;
+  const t=e.target.closest("[data-id],[data-del],[data-unpick],[data-detail],[data-afodds],[data-afh2h],#closeDetail"); if(!t) return;
+  if(t.dataset.afodds||t.dataset.afh2h){ const o=offer.find(x=>x.id==(t.dataset.afodds||t.dataset.afh2h)); if(!o) return;
+    t.disabled=true; t.textContent="⏳ pobieram…";
+    (t.dataset.afodds?afOdds(o):afH2H(o)).then(()=>{renderDetail();render()}).catch(err=>{t.textContent="⚠️ "+err.message}); return; }
   if(t.id==="closeDetail"){detailId=null;renderDetail();renderOffer();return}
   if(t.dataset.detail){detailId=+t.dataset.detail;renderDetail();renderOffer();$("detail").scrollIntoView({behavior:"smooth"});return}
   if(t.dataset.del){const id=+t.dataset.del;offer=offer.filter(o=>o.id!==id);delete picks[id];if(detailId===id){detailId=null;renderDetail()}render();return}
@@ -739,6 +869,9 @@ $("detail").addEventListener("input",e=>{
 });
 $("gen").onclick=generate;
 $("reroll").onclick=()=>loadReal();
+$("afKey").value=afKey();
+$("afSave").onclick=()=>{const k=$("afKey").value.trim(); if(!k){alert("Wklej klucz API-Football.");return} localStorage.setItem("afKey",k); afEnrich();};
+$("afDel").onclick=()=>{localStorage.removeItem("afKey"); Object.keys(localStorage).filter(k=>k.startsWith("af:")).forEach(k=>localStorage.removeItem(k)); $("afKey").value=""; loadReal(); afStatus("Klucz usunięty z tej przeglądarki.");};
 $("clear").onclick=()=>{picks={};render()};
 $("stake").oninput=renderSlip; $("tax").onchange=renderSlip; $("sysK").onchange=renderSlip;
 $("wModel").oninput=()=>{$("wLbl").textContent=$("wModel").value+"%";render()};
