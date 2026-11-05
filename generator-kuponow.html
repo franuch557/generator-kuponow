@@ -176,7 +176,10 @@
       <h2>Oferta</h2>
       <h4 style="margin-top:0">Ligi</h4>
       <div class="row" id="lgPick" style="gap:4px 14px;margin-bottom:8px"></div>
-      <h4>Dni</h4>
+      <div class="row" style="margin:-2px 0 8px"><button class="sec" id="cupsBtn">🏆 Europejskie puchary</button><button class="sec" id="topBtn">⭐ Top 5 lig</button></div>
+      <div class="row" style="margin:6px 0 6px;align-items:center"><h4 style="margin:0">Dni</h4>
+        <label style="flex-direction:row;align-items:center;gap:6px">zakres <select id="dayRange"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select></label>
+        <label class="chk" style="padding:0"><input type="checkbox" id="autoRef" checked> auto-odświeżanie co 10 min</label></div>
       <div class="row" id="dayPick" style="gap:6px;margin-bottom:14px"></div>
       <div class="row">
         <label>Gospodarz <input id="aHome" placeholder="np. Legia" style="width:120px"></label>
@@ -238,12 +241,16 @@ const LEAGUES={"eng.1":"Premier League","esp.1":"LaLiga","ita.1":"Serie A","ger.
   "ned.1":"Eredivisie","por.1":"Primeira Liga","eng.2":"Championship","tur.1":"Süper Lig","bel.1":"Jupiler Pro League","sco.1":"Premiership (Szkocja)",
   "pol.1":"Ekstraklasa"};
 const AF_ONLY=new Set(["pol.1"]);   // tylko z kluczem API-Football
-const DEF_LG=["eng.1","esp.1","ita.1","ger.1","fra.1","uefa.champions"];
+const CUPS=new Set(["uefa.champions","uefa.europa","uefa.europa.conf"]);
+const DEF_LG=["eng.1","esp.1","ita.1","ger.1","fra.1","uefa.champions","uefa.europa","uefa.europa.conf"];
 let selLeagues=JSON.parse(localStorage.getItem("selLeagues")||"null")||DEF_LG.slice();
+if(localStorage.getItem("lgv")!=="2"){ selLeagues=[...new Set([...selLeagues,...CUPS])]; localStorage.setItem("lgv","2"); }
 let selDays=new Set(), loadedLg=new Set(), loading=false;
 const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-function visible(){ return offer.filter(o=>(!o.lg||selLeagues.includes(o.lg)) && (!selDays.size||selDays.has(dayKey(o.date)))); }
-const DAYS=7;
+function visible(){ const now=Date.now(); return offer.filter(o=>(!o.real||o.date>now) && (!o.lg||selLeagues.includes(o.lg)) && (!selDays.size||selDays.has(dayKey(o.date)))); }
+let DAYS=+localStorage.getItem("days")||14;
+const NEAR_H=72;   // szczegóły (H2H, składy, newsy) od razu dla meczów w ciągu 72 h, dalsze — po kliknięciu 🔍
+const AUTO_MIN=10;
 // Rynki (indeks w o.odds)
 const MK  = ["1","X","2","1X (gosp. lub remis)","12 (bez remisu)","X2 (remis lub gość)","Powyżej 1.5 gola","Poniżej 1.5 gola","Powyżej 2.5 gola","Poniżej 2.5 gola","Powyżej 3.5 gola","Poniżej 3.5 gola","Obie strzelą: tak","Obie strzelą: nie"];
 const MKS = ["1","X","2","1X","12","X2","P 1.5","Pn 1.5","P 2.5","Pn 2.5","P 3.5","Pn 3.5","BTTS T","BTTS N"];
@@ -263,7 +270,9 @@ const BOOKIES = [
     "LaLiga":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/hiszpania/laliga/1/31/8",
     "Serie A":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/wlochy/serie-a/1/30/23",
     "Bundesliga":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/niemcy/bundesliga/1/29/35",
-    "Ligue 1":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/francja/ligue-1/1/6/34"}},
+    "Ligue 1":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/francja/ligue-1/1/6/34",
+    "Liga Europy":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/klubowe/liga-europy/1/390/672",
+    "Liga Konferencji":"https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/klubowe/liga-konferencji/1/390/17633"}},
   {key:"betclic", name:"Betclic", short:"BC", home:"https://www.betclic.pl/", leagues:{
     "Ekstraklasa":"https://www.betclic.pl/pilka-nozna-sfootball/ekstraklasa-c221",
     "Premier League":"https://www.betclic.pl/pilka-nozna-sfootball/premier-league-c3",
@@ -275,7 +284,10 @@ const BOOKIES = [
     "Premier League":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/anglia/premier-league/wszystko",
     "LaLiga":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/hiszpania/laliga/wszystko",
     "Serie A":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/wlochy/serie-a/wszystko",
-    "Bundesliga":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/niemcy/bundesliga/wszystko"}}
+    "Bundesliga":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/niemcy/bundesliga/wszystko",
+    "Liga Mistrzów":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/miedzynarodowe-klubowe/liga-mistrzow/wszystko",
+    "Liga Europy":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/miedzynarodowe-klubowe/liga-europy/wszystko",
+    "Liga Konferencji":"https://superbet.pl/zaklady-bukmacherskie/pilka-nozna/miedzynarodowe-klubowe/liga-konferencji/wszystko"}}
 ];
 function bookieLinks(o){
   o.links = o.links || {};
@@ -421,14 +433,16 @@ function parseOdds(c){
   return {odds,provider:o.provider?.displayName||o.provider?.name||null};
 }
 function teamGames(lg,id){
-  const key=lg+"/"+id; if(teamCache[key]) return teamCache[key];
-  return teamCache[key]=getJSON(`${ESPN}/${lg}/teams/${id}/schedule`).then(s=>(s.events||[]).map(e=>{
+  const src=CUPS.has(lg)?"all":lg, key=src+"/"+id;   // w pucharach: wszystkie rozgrywki drużyny (liga + puchary)
+  if(teamCache[key]) return teamCache[key];
+  const p=getJSON(`${ESPN}/${src}/teams/${id}/schedule`).then(s=>(s.events||[]).map(e=>{
     const c=e.competitions[0]; if(!c.status?.type?.completed) return null;
     const me=c.competitors.find(x=>x.team.id==id), op=c.competitors.find(x=>x.team.id!=id); if(!me||!op) return null;
     const sc=x=>+(x.score&&typeof x.score==="object"?(x.score.value??x.score.displayValue):x.score);
     const gf=sc(me), ga=sc(op); if(!isFinite(gf)||!isFinite(ga)) return null;
     return {date:new Date(e.date),home:me.homeAway==="home",gf,ga,r:gf>ga?"W":gf<ga?"L":"D",opp:op.team.abbreviation||op.team.displayName,id:e.id};
   }).filter(Boolean).sort((a,b)=>b.date-a.date)).catch(()=>[]);
+  p.t=Date.now(); return teamCache[key]=p;
 }
 function teamStats(games,atHome,kick,stand){
   const avg=(a,k)=>a.length?a.reduce((x,g)=>x+g[k],0)/a.length:null;
@@ -474,7 +488,14 @@ async function loadSummary(o){
 async function loadReal(reset=true){
   if(loading) return; loading=true;
   const want=selLeagues.filter(lg=>LEAGUES[lg]&&!AF_ONLY.has(lg));
-  if(reset){ offer=offer.filter(o=>o.manual); picks={}; detailId=null; loadedLg.clear(); renderDetail(); render(); }
+  if(reset){
+    restore={picks:Object.entries(picks).map(([id,i])=>{const o=offer.find(x=>x.id==id);return o&&{k:o.espnId||o.afId||null,id:o.manual?o.id:null,i}}).filter(Boolean),
+             detail:(offer.find(x=>x.id===detailId)||{}).espnId||(offer.find(x=>x.id===detailId)||{}).afId||null, links:Object.fromEntries(offer.filter(o=>o.links&&(o.espnId||o.afId)).map(o=>[o.espnId||o.afId,o.links])),
+             inj:Object.fromEntries(offer.filter(o=>o.espnId&&!o.stats.injAuto).map(o=>[o.espnId,[o.stats.home.inj,o.stats.away.inj]]))};
+    offer=offer.filter(o=>o.manual); picks={}; loadedLg.clear();
+    for(const k in sumCache) delete sumCache[k];
+    const now=Date.now(); for(const k in teamCache) if(now-(teamCache[k].t||0)>30*6e4) delete teamCache[k];
+  }
   const lgs=want.filter(lg=>!loadedLg.has(lg));
   if(!lgs.length){ loading=false; render(); if(afKey()&&selLeagues.some(l=>AF_ONLY.has(l))&&!offer.some(o=>o.afOnly)) afEnrich(); else if(!want.length) status("Zaznacz przynajmniej jedną ligę."); return; }
   status(`⏳ Pobieram terminarz z ESPN: ${lgs.map(l=>LEAGUES[l]).join(", ")}…`);
@@ -499,17 +520,26 @@ async function loadReal(reset=true){
       league:LEAGUES[m.lg],date:kick,venue:m.c.venue?.fullName||"",city:m.c.venue?.address?.city||"",neutral:!!m.c.neutralSite,provider,odds,real:true,news:[],
       stats:{home:teamStats(gh,true,kick,st.map[m.H.team.id]),away:teamStats(ga,false,kick,st.map[m.A.team.id]),h2h:{hw:0,d:0,aw:0},teams:st.n,venueSplit:true,lineup:null}};
     dcOdds(o).forEach((k,i)=>o.odds[3+i]=k);
-    await loadSummary(o);
+    if(kick-Date.now()<NEAR_H*36e5) await loadSummary(o); else o.lazy=true;
     status(`⏳ Analizuję mecze… ${++done}/${raw.length}`);
     return o;
   });
   offer=offer.concat(built.filter(Boolean)).sort((a,b)=>a.date-b.date);
-  loading=false;
+  loading=false; lastLoad=Date.now(); applyRestore();
   const noOdds=offer.filter(o=>o.real&&!o.odds[0]).length, lus=offer.filter(o=>o.stats.lineup).length;
-  status(`✅ ${offer.filter(o=>o.real).length} prawdziwych meczów z najbliższych ${DAYS} dni · dane: ESPN · kursy: ${offer.find(o=>o.provider)?.provider||"brak"}${noOdds?` · ${noOdds} bez kursów (wpisz w 🔍)`:""} · potwierdzone składy: ${lus} · pobrano ${new Date().toLocaleTimeString("pl-PL")}`);
+  status(`✅ ${offer.filter(o=>o.real).length} prawdziwych meczów z najbliższych ${DAYS} dni · dane: ESPN · kursy: ${offer.find(o=>o.provider)?.provider||"brak"}${noOdds?` · ${noOdds} bez kursów (wpisz w 🔍)`:""} · potwierdzone składy: ${lus} · pobrano ${new Date().toLocaleTimeString("pl-PL")}${$("autoRef").checked?` · auto-odświeżanie co ${AUTO_MIN} min`:""}`);
   render();
+  if(needReset){ needReset=false; return loadReal(true); }
   if(pendingLg()) return loadReal(false);   // ligi zaznaczone w trakcie ładowania
   if(afKey()) afEnrich();
+}
+let restore=null, lastLoad=0, needReset=false;
+function applyRestore(){
+  if(!restore) return;
+  restore.picks.forEach(r=>{const o=r.id?offer.find(x=>x.id===r.id):offer.find(x=>r.k&&(x.espnId===r.k||x.afId===r.k)); if(o&&o.odds[r.i]>1&&(!o.real||o.date>Date.now())) picks[o.id]=r.i;});
+  offer.forEach(o=>{const k=o.espnId||o.afId; if(k&&restore.links[k]) o.links=restore.links[k]; if(o.espnId&&restore.inj[o.espnId]&&!o.stats.injAuto){[o.stats.home.inj,o.stats.away.inj]=restore.inj[o.espnId];}});
+  if(restore.detail){const o=offer.find(x=>x.espnId===restore.detail||x.afId===restore.detail); detailId=o?o.id:null;} else detailId=null;
+  renderDetail(); render();
 }
 const pendingLg=()=>selLeagues.some(l=>LEAGUES[l]&&!AF_ONLY.has(l)&&!loadedLg.has(l));
 
@@ -603,7 +633,7 @@ async function afEnrich(){
   }catch(e){
     afStatus(`⚠️ API-Football: ${esc(e.message)}${/season|plan/i.test(e.message)?" — darmowy plan nie obejmuje bieżącego sezonu; potrzebny płatny plan.":""} Strona działa dalej na danych ESPN.`);
   }
-  renderDetail(); render();
+  applyRestore(); renderDetail(); render();
 }
 async function afOdds(o){
   const d=await af(`/odds?fixture=${o.afId}`,60), bms=d.response?.[0]?.bookmakers||[];
@@ -635,11 +665,11 @@ function renderFilters(){
   $("lgPick").innerHTML=Object.entries(LEAGUES).map(([k,n])=>{
     const cnt=offer.filter(o=>o.lg===k).length, need=AF_ONLY.has(k)&&!afKey();
     return `<label class="chk" title="${need?"wymaga klucza API-Football":""}" style="${need?"opacity:.5":""}"><input type="checkbox" data-lg="${k}" ${selLeagues.includes(k)?"checked":""} ${need?"disabled":""}> ${n}${need?" 🔑":""}${cnt&&selLeagues.includes(k)?` <span class="league">(${cnt})</span>`:""}</label>`}).join("");
-  const base=offer.filter(o=>!o.lg||selLeagues.includes(o.lg)), now=new Date();
+  const now=new Date(), base=offer.filter(o=>(!o.real||o.date>now)&&(!o.lg||selLeagues.includes(o.lg)));
   const days=[...Array(DAYS).keys()].map(i=>{const d=new Date(now.getTime()+i*864e5);return {k:dayKey(d),d,n:base.filter(o=>dayKey(o.date)===dayKey(d)).length}});
   const lbl=(d,i)=>i===0?"Dziś":i===1?"Jutro":d.toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"numeric"});
   $("dayPick").innerHTML=`<button class="chip ${selDays.size?"":"on"}" data-day="all">Wszystkie<small>${base.length}</small></button>`+
-    days.map((x,i)=>`<button class="chip ${selDays.has(x.k)?"on":""}" data-day="${x.k}" ${x.n?"":'disabled style="opacity:.35"'}>${lbl(x.d,i)}<small>${x.n}</small></button>`).join("");
+    days.map((x,i)=>(x.n||i<2)?`<button class="chip ${selDays.has(x.k)?"on":""}" data-day="${x.k}" ${x.n?"":'disabled style="opacity:.35"'}>${lbl(x.d,i)}<small>${x.n}</small></button>`:"").join("");
 }
 function renderHead(){
   $("offerHead").innerHTML=`<tr><th>Mecz</th><th>Data</th>${SHOW.map(i=>`<th class="c ${SEP.has(i)?"sep":""}">${MKS[i]}</th>`).join("")}<th class="sep">Najpewniejszy typ</th><th class="c">xG</th><th></th></tr>`;
@@ -910,7 +940,7 @@ document.addEventListener("click",e=>{
     t.disabled=true; t.textContent="⏳ pobieram…";
     (t.dataset.afodds?afOdds(o):afH2H(o)).then(()=>{renderDetail();render()}).catch(err=>{t.textContent="⚠️ "+err.message}); return; }
   if(t.id==="closeDetail"){detailId=null;renderDetail();renderOffer();return}
-  if(t.dataset.detail){detailId=+t.dataset.detail;renderDetail();renderOffer();$("detail").scrollIntoView({behavior:"smooth"});return}
+  if(t.dataset.detail){detailId=+t.dataset.detail; const lo=offer.find(x=>x.id===detailId); if(lo&&lo.lazy){lo.lazy=false; loadSummary(lo).then(()=>{renderDetail();render()});} renderDetail();renderOffer();$("detail").scrollIntoView({behavior:"smooth"});return}
   if(t.dataset.del){const id=+t.dataset.del;offer=offer.filter(o=>o.id!==id);delete picks[id];if(detailId===id){detailId=null;renderDetail()}render();return}
   if(t.dataset.unpick){delete picks[+t.dataset.unpick];render();return}
   if(t.dataset.id){const id=+t.dataset.id,i=+t.dataset.i;picks[id]===i?delete picks[id]:picks[id]=i;render()}
@@ -936,6 +966,23 @@ $("detail").addEventListener("input",e=>{
 });
 $("gen").onclick=generate;
 $("reroll").onclick=()=>loadReal(true);
+$("dayRange").value=String(DAYS);
+const fullReload=()=>{ if(loading) needReset=true; else loadReal(true); };
+$("dayRange").onchange=()=>{DAYS=+$("dayRange").value; localStorage.setItem("days",DAYS); selDays.clear(); fullReload();};
+const setLeagues=l=>{selLeagues=l; localStorage.setItem("selLeagues",JSON.stringify(selLeagues)); render(); loadReal(false);};
+$("cupsBtn").onclick=()=>{ selLeagues=[...new Set([...selLeagues,...CUPS])]; localStorage.setItem("selLeagues",JSON.stringify(selLeagues));
+  if(DAYS<30){DAYS=30;localStorage.setItem("days",30);$("dayRange").value="30"; fullReload();} else { render(); loadReal(false); } };
+$("topBtn").onclick=()=>setLeagues([...new Set([...selLeagues,"eng.1","esp.1","ita.1","ger.1","fra.1"])]);
+$("autoRef").checked=localStorage.getItem("autoRef")!=="0";
+$("autoRef").onchange=()=>localStorage.setItem("autoRef",$("autoRef").checked?"1":"0");
+function autoTick(){
+  if(!$("autoRef").checked||loading||document.visibilityState!=="visible") return;
+  if($("detail").contains(document.activeElement)) return;          // nie przerywaj edycji w 🔍
+  if(Date.now()-lastLoad>=AUTO_MIN*6e4) loadReal(true);
+}
+setInterval(autoTick,60e3);
+document.addEventListener("visibilitychange",autoTick);
+setInterval(()=>{ if(!loading) renderOffer(); },60e3);               // znikają mecze, które już się zaczęły
 document.addEventListener("change",e=>{ const lg=e.target.dataset?.lg; if(!lg) return;
   selLeagues = e.target.checked ? [...new Set([...selLeagues,lg])] : selLeagues.filter(x=>x!==lg);
   localStorage.setItem("selLeagues",JSON.stringify(selLeagues));
