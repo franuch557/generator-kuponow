@@ -144,7 +144,7 @@
           <label class="inl" title="Minimalny kurs łączny kuponu — generator dobierze typy z najwyższą szansą, które razem dają co najmniej ten kurs">Kurs min. <input id="gMinTotal" type="number" step="0.1" min="0" placeholder="np. 2.0" style="width:80px"></label>
           <select id="gTypes">
             <option value="safe">🔒 Najpewniejsze</option>
-            <option value="value">💎 Value</option>
+            <option value="value">💎 Value (w teście −10%)</option>
             <option value="all">🎲 Losowo</option>
           </select>
         </div>
@@ -168,6 +168,7 @@
         </div>
         <p class="hint">Wyższa szansa = niższy kurs. Najbezpieczniej: mało zdarzeń, podwójna szansa, „powyżej 1.5”, kupon systemowy.</p>
       </details>
+      <p class="hint" style="margin:8px 0 0">🧪 Test na 1499 meczach: po podatku <b>żadna strategia nie zarabiała</b>. Najmniej traciło stawianie na faworytów; najwięcej — remisy, outsiderzy i value bety modelu. <a href="#bt" style="color:#38bdf8" onclick="document.getElementById('bt').open=true">Szczegóły</a></p>
     </section>
 
     <section class="panel" id="detail" style="display:none"></section>
@@ -176,7 +177,8 @@
     <section class="panel">
       <div class="tbar" style="margin-bottom:6px">
         <h2 style="margin:0">Mecze</h2>
-        <label class="chk" style="padding:0"><input type="checkbox" id="allMk"> wszystkie rynki</label>
+        <div class="seg"><label class="chk" style="padding:0" title="W teście na 1499 meczach typy po kursach powyżej 5 traciły, a po kursach 10+ aż 66% stawek"><input type="checkbox" id="hideLong" checked> ukryj kursy &gt; 5</label>
+        <label class="chk" style="padding:0"><input type="checkbox" id="allMk"> wszystkie rynki</label></div>
       </div>
       <div class="scroll">
       <table class="offer">
@@ -188,8 +190,35 @@
     </section>
 
     <!-- SEKCJE ZWIJANE -->
+    <details class="panel fold" id="bt">
+      <summary>🧪 Test na 1499 meczach — co działa, a co nie</summary>
+      <p class="hint" style="margin-top:12px">Rozegrane mecze top 5 lig (1169) i europejskich pucharów (330), 1.02–5.11.2026, kursy zamknięcia (DraftKings przez ESPN). Stawka 1 zł na każdy typ. „Zwrot” = zysk lub strata na każdą postawioną złotówkę.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Strategia</th><th class="c">Trafność</th><th class="c">Zwrot</th><th class="c">Z podatkiem PL</th></tr></thead>
+        <tbody>
+          <tr><td><b>Zawsze faworyt</b></td><td class="c">55,6%</td><td class="c">−0,5%</td><td class="c neg">−12,4%</td></tr>
+          <tr><td>Kurs 1,01–1,30</td><td class="c">83,8%</td><td class="c">0,0%</td><td class="c neg">−12,0%</td></tr>
+          <tr><td>Najpewniejszy typ wg modelu</td><td class="c">54,2%</td><td class="c">−1,0%</td><td class="c neg">−12,9%</td></tr>
+          <tr><td>Zawsze gospodarz</td><td class="c">45,0%</td><td class="c">−5,3%</td><td class="c neg">−16,6%</td></tr>
+          <tr><td>Powyżej 2.5 gola</td><td class="c">51,4%</td><td class="c">−4,8%</td><td class="c neg">−16,2%</td></tr>
+          <tr><td>Zawsze outsider</td><td class="c">21,5%</td><td class="c neg">−10,4%</td><td class="c neg">−21,2%</td></tr>
+          <tr><td>Value bety modelu</td><td class="c">~25%</td><td class="c neg">−9 do −15%</td><td class="c neg">−20 do −26%</td></tr>
+          <tr><td>Zawsze remis</td><td class="c">22,8%</td><td class="c neg">−12,9%</td><td class="c neg">−23,4%</td></tr>
+          <tr><td>Kurs 10+</td><td class="c">3,2%</td><td class="c neg">−66%</td><td class="c neg">−70%</td></tr>
+          <tr><td>AKO 3 największych faworytów dnia</td><td class="c">35,1%</td><td class="c">+12%*</td><td class="c neg">−1,4%</td></tr>
+        </tbody>
+      </table></div>
+      <div class="tips" style="margin-top:10px">
+        <div class="tip"><b>Najmniej traci: faworyt</b>Mocni faworyci wchodzili częściej, niż wynikało z kursu (szansa 80%+ → 91% trafień). Ale po podatku i tak strata ok. 12%.</div>
+        <div class="tip"><b>Unikaj: remisy, outsiderzy, kursy 10+</b>Bukmacherzy najbardziej przeszacowują mało prawdopodobne wyniki.</div>
+        <div class="tip"><b>Zyski to przypadek</b>* Strategie „na plusie” miały bardzo szeroki zakres niepewności (AKO: od −22% do +46%). Najlepsza z pierwszej połowy danych w drugiej dała −9,4%.</div>
+      </div>
+      <p class="hint" style="margin-top:8px">Przez podatek 12% strategia musiałaby mieć przewagę ok. 13,6%, żeby wyjść na zero — najlepsza znaleziona ma ok. 0%. Ograniczenia: kursy amerykańskiego bukmachera, 9 miesięcy danych, model w teście bez kontuzji i tabeli.</p>
+    </details>
+
     <details class="panel fold">
-      <summary>💎 Value bety</summary>
+      <summary>💎 Value bety <span class="league" style="font-weight:400">— w teście −9% do −15%</span></summary>
+      <p class="hint" style="margin-top:12px;background:#2a1f12;border:1px solid #6b4a1a;border-radius:8px;padding:8px 10px;color:#f5c27a">⚠️ W teście na 1499 meczach value bety z tego modelu <b>traciły 9–15% stawek</b> (z podatkiem 20–26%) — więcej niż zwykłe stawianie na faworyta (−0,5%). „Wartość” widziana przez model to głównie jego błędy. Traktuj tę listę jako ciekawostkę, nie sygnał do gry.</p>
       <p class="hint" style="margin-top:12px">Typy, w których analiza ocenia szansę wyżej niż kurs. Przez podatek 12% typ jest na plus dopiero przy <b>EV po podatku</b> &gt; 0. <b>Min. kurs</b> = najniższy kurs, przy którym warto stawiać.</p>
       <div class="row" style="margin-bottom:8px">
         <label>Pokaż <select id="vFilter"><option value="pre">EV &gt; 0</option><option value="post">EV po podatku &gt; 0</option><option value="all">wszystkie (ranking)</option></select></label>
@@ -274,6 +303,7 @@ let selLeagues=JSON.parse(localStorage.getItem("selLeagues")||"null")||DEF_LG.sl
 if(localStorage.getItem("lgv")!=="2"){ selLeagues=[...new Set([...selLeagues,...CUPS])]; localStorage.setItem("lgv","2"); }
 let selDays=new Set(), loadedLg=new Set(), loading=false;
 const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const longOff=k=>!!(document.getElementById("hideLong")?.checked && k>5);
 function visible(){ const now=Date.now(); return offer.filter(o=>(!o.real||o.date>now) && (!o.lg||selLeagues.includes(o.lg)) && (!selDays.size||selDays.has(dayKey(o.date)))); }
 let DAYS=+localStorage.getItem("days")||14;
 const NEAR_H=72;   // szczegóły (H2H, składy, newsy) od razu dla meczów w ciągu 72 h, dalsze — po kliknięciu 🔍
@@ -713,7 +743,8 @@ function renderOffer(){
       <td>${esc(o.home)} – ${esc(o.away)}<div class="league">${esc(o.league)}${o.stats.lineup?" · ✅ składy":""}</div></td>
       <td class="league">${fmtDate(o.date)}</td>
       ${SHOW.map(i=>{const k=o.odds[i], sep=SEP.has(i)?"sep":"";return k>1
-        ?`<td class="odd ${sep} ${picks[o.id]===i?"sel":""} ${a.ev[i]>0?"val":""}" data-id="${o.id}" data-i="${i}" title="${MK[i]} · szansa ${pct(a.fin[i])} · EV ${(a.ev[i]*100).toFixed(1)}%">${k.toFixed(2)}</td>`
+        ?(longOff(k)&&picks[o.id]!==i)?`<td class="na ${sep}" style="color:#5b6b80" title="Kurs powyżej 5 — w teście te typy traciły (kurs 10+: −66%). Odznacz „ukryj kursy > 5”, aby je wybrać.">${k.toFixed(2)}</td>`
+        :`<td class="odd ${sep} ${picks[o.id]===i?"sel":""} ${a.ev[i]>0?"val":""}" data-id="${o.id}" data-i="${i}" title="${MK[i]} · szansa ${pct(a.fin[i])} · EV ${(a.ev[i]*100).toFixed(1)}%">${k.toFixed(2)}</td>`
         :`<td class="na ${sep}">–</td>`}).join("")}
       <td class="conf sep">${b>=0?`<span class="bar"><i style="width:${pb*100}%;background:${confColor(pb)}"></i></span><b>${MKS[b]}</b> ${pct(pb)}`:"–"}</td>
       <td style="white-space:nowrap"><button class="mag" data-detail="${o.id}" title="Szczegóły analizy">🔍</button><button class="del" data-del="${o.id}" title="Usuń">✕</button></td>
@@ -826,6 +857,13 @@ function calc(){
   return {sel,n,k,isSys:k<n,cs,per,stake,taxOn,total,maxGross,maxNet:net(maxGross),pAny,pProfit,ev:expNet-stake,ps};
 }
 
+function riskNote(o,i){
+  const k=o.odds[i];
+  if(i===1) return `<br><span style="color:#b45309">⚠️ remisy w teście: −13% stawek</span>`;
+  if(k>=10) return `<br><span style="color:#b91c1c">⚠️ kurs 10+ w teście: −66% stawek</span>`;
+  if(k>5) return `<br><span style="color:#b45309">⚠️ kurs &gt; 5 — w teście na minusie</span>`;
+  return "";
+}
 function renderSlip(){
   renderSysSelect();
   const c=calc(), now=new Date();
@@ -834,7 +872,7 @@ function renderSlip(){
   else{
     html+=c.sel.map((o,j)=>{const i=picks[o.id];return `
       <div class="pick">
-        <div>${esc(o.home)} – ${esc(o.away)}<small>${esc(o.league)} · ${fmtDate(o.date)}<br>typ: <b>${MK[i]}</b> · szansa ${pct(c.ps[j])}</small>${bookieLinks(o)}</div>
+        <div>${esc(o.home)} – ${esc(o.away)}<small>${esc(o.league)} · ${fmtDate(o.date)}<br>typ: <b>${MK[i]}</b> · szansa ${pct(c.ps[j])}${riskNote(o,i)}</small>${bookieLinks(o)}</div>
         <b>${o.odds[i].toFixed(2)}</b>
         <button class="x" data-unpick="${o.id}" title="Usuń z kuponu">✕</button>
       </div>`}).join("");
@@ -861,7 +899,7 @@ function renderValue(){
   const mode=$("vFilter").value, minP=(parseFloat($("vMinP").value)||0)/100, taxF=$("vTax").checked?0.88:1;
   const al=allowed(), rows=[];
   visible().forEach(o=>{ const a=analyze(o);
-    al.forEach(i=>{ const k=o.odds[i], p=a.fin[i]; if(!(k>1)||p==null||p<minP) return;
+    al.forEach(i=>{ const k=o.odds[i], p=a.fin[i]; if(!(k>1)||p==null||p<minP||longOff(k)) return;
       const ev=p*k-1, evT=p*k*taxF-1;
       if(mode==="pre"&&ev<=0) return; if(mode==="post"&&evT<=0) return;
       rows.push({o,i,k,p,ev,evT,fair:1/p,minK:1/(p*taxF),mk:a.mk.p[i],mo:a.mo.p[i]}); }); });
@@ -910,7 +948,7 @@ function generate(){
   const cands=[];
   visible().forEach(o=>{
     const a=analyze(o);
-    let idx=al.filter(i=>o.odds[i]>=min&&o.odds[i]<=max&&a.fin[i]!=null&&a.fin[i]>=minP);
+    let idx=al.filter(i=>o.odds[i]>=min&&o.odds[i]<=max&&!longOff(o.odds[i])&&a.fin[i]!=null&&a.fin[i]>=minP);
     if(mode==="value") idx=idx.filter(i=>a.ev[i]>0);
     if(!idx.length) return;
     const all=idx.slice();
@@ -1041,6 +1079,8 @@ $("clear").onclick=()=>{picks={};render()};
 $("stake").oninput=()=>{renderSlip();renderPlace()}; $("tax").onchange=()=>{renderSlip();renderPlace()}; $("sysK").onchange=()=>{renderSlip();renderPlace()};
 $("wModel").oninput=()=>{$("wLbl").textContent=$("wModel").value+"%";render()};
 ["m1x2","mDC","mGoals","mBTTS"].forEach(id=>$(id).onchange=()=>{renderOffer();renderValue()});
+$("hideLong").checked=localStorage.getItem("hideLong")!=="0";
+$("hideLong").onchange=()=>{localStorage.setItem("hideLong",$("hideLong").checked?"1":"0"); renderOffer(); renderValue();};
 ["vFilter","vTax"].forEach(id=>$(id).onchange=renderValue); $("vMinP").oninput=renderValue;
 $("copy").onclick=async()=>{try{await navigator.clipboard.writeText(slipText());$("copy").textContent="Skopiowano ✓";setTimeout(()=>$("copy").textContent="Kopiuj jako tekst",1500)}catch{prompt("Skopiuj:",slipText())}};
 $("add").onclick=()=>{
