@@ -226,7 +226,7 @@
         <label class="chk"><input type="checkbox" id="vTax" checked> z podatkiem PL</label>
       </div>
       <div class="scroll"><table>
-        <thead><tr><th>Mecz</th><th>Typ</th><th class="c">Kurs</th><th class="c">Szansa</th><th class="c">Kurs uczciwy</th><th class="c">Min. kurs</th><th class="c">EV</th><th class="c">EV po podatku</th><th class="c">Rynek / model</th><th></th></tr></thead>
+        <thead><tr><th>Mecz</th><th>Typ</th><th class="c">Kurs</th><th class="c">Szansa</th><th class="c">Kurs uczciwy</th><th class="c">Min. kurs</th><th class="c">EV</th><th class="c">EV po podatku</th><th class="c">Rynek / model</th><th class="c">Ost. 10</th><th></th></tr></thead>
         <tbody id="valueList"></tbody>
       </table></div>
       <p class="hint" style="margin-top:8px">Value istnieje tylko według modelu, który nie był testowany na historii. Duże EV zwykle oznacza, że model czegoś nie wie.</p>
@@ -510,7 +510,7 @@ function teamStats(games,atHome,kick,stand){
   const cnt=r=>ven.filter(g=>g.r===r).length;
   return {form:games.slice(0,5).map(g=>g.r).join(""), gf:r2(mix(avg(ven,"gf"),aGF,ven.length)), ga:r2(mix(avg(ven,"ga"),aGA,ven.length)),
     pos:stand?.rank||10, inj:0, rest:games[0]?Math.max(1,Math.round((kick-games[0].date)/864e5)):7,
-    venueRec:ven.length?`${cnt("W")}-${cnt("D")}-${cnt("L")}`:"–", nVenue:ven.length, last5:games.slice(0,5), lastId:games[0]?.id, stand};
+    venueRec:ven.length?`${cnt("W")}-${cnt("D")}-${cnt("L")}`:"–", nVenue:ven.length, last5:games.slice(0,5), last10:games.slice(0,10), lastId:games[0]?.id, stand};
 }
 async function standings(lg){
   const s=await getJSON(`${ESPN_ST}/${lg}/standings`), map={}; let n=0;
@@ -744,9 +744,9 @@ function renderOffer(){
       <td class="league">${fmtDate(o.date)}</td>
       ${SHOW.map(i=>{const k=o.odds[i], sep=SEP.has(i)?"sep":"";return k>1
         ?(longOff(k)&&picks[o.id]!==i)?`<td class="na ${sep}" style="color:#5b6b80" title="Kurs powyżej 5 — w teście te typy traciły (kurs 10+: −66%). Odznacz „ukryj kursy > 5”, aby je wybrać.">${k.toFixed(2)}</td>`
-        :`<td class="odd ${sep} ${picks[o.id]===i?"sel":""} ${a.ev[i]>0?"val":""}" data-id="${o.id}" data-i="${i}" title="${MK[i]} · szansa ${pct(a.fin[i])} · EV ${(a.ev[i]*100).toFixed(1)}%">${k.toFixed(2)}</td>`
+        :`<td class="odd ${sep} ${picks[o.id]===i?"sel":""} ${a.ev[i]>0?"val":""}" data-id="${o.id}" data-i="${i}" title="${MK[i]} · szansa ${pct(a.fin[i])} · EV ${(a.ev[i]*100).toFixed(1)}%${hitTitle(o,i)}">${k.toFixed(2)}</td>`
         :`<td class="na ${sep}">–</td>`}).join("")}
-      <td class="conf sep">${b>=0?`<span class="bar"><i style="width:${pb*100}%;background:${confColor(pb)}"></i></span><b>${MKS[b]}</b> ${pct(pb)}`:"–"}</td>
+      <td class="conf sep">${b>=0?`<span class="bar"><i style="width:${pb*100}%;background:${confColor(pb)}"></i></span><b>${MKS[b]}</b> ${pct(pb)} <span class="league">${hitTxt(o,b)}</span>`:"–"}</td>
       <td style="white-space:nowrap"><button class="mag" data-detail="${o.id}" title="Szczegóły analizy">🔍</button><button class="del" data-del="${o.id}" title="Usuń">✕</button></td>
     </tr>`;
   }).join("");
@@ -812,7 +812,7 @@ function renderDetailOut(){
      <td class="c num">${a.mk.p[i]!=null?pct(a.mk.p[i]):"–"}</td><td class="c num">${pct(a.mo.p[i])}</td>
      <td class="c num"><b>${a.fin[i]!=null?pct(a.fin[i]):"–"}</b></td>
      <td class="c num ${a.ev[i]>0?"pos":"neg"}">${a.ev[i]!=null?(a.ev[i]>0?"+":"")+(a.ev[i]*100).toFixed(1)+"%":"–"}</td>
-     <td class="c num">${a.fin[i]!=null?(1/a.fin[i]).toFixed(2):"–"}</td></tr>`).join("");
+     <td class="c num">${a.fin[i]!=null?(1/a.fin[i]).toFixed(2):"–"}</td><td class="c num">${hitTxt(o,i)||"–"}</td></tr>`).join("");
   $("detailOut").innerHTML=`
     <div class="grid2">
       <div><h4>Wpływ zmiennych na oczekiwane gole</h4>
@@ -825,7 +825,7 @@ function renderDetailOut(){
       </div>
     </div>
     <h4>Porównanie rynków (waga modelu ${Math.round(w*100)}%)</h4>
-    <div class="scroll"><table><thead><tr><th>Typ</th><th class="c">Kurs</th><th class="c">Rynek</th><th class="c">Model</th><th class="c">Finalna</th><th class="c">EV</th><th class="c">Kurs uczciwy</th></tr></thead><tbody>${mk}</tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Typ</th><th class="c">Kurs</th><th class="c">Rynek</th><th class="c">Model</th><th class="c">Finalna</th><th class="c">EV</th><th class="c">Kurs uczciwy</th><th class="c" title="Ile razy typ wszedłby w ostatnich 10 meczach: gospodarz · gość">Ost. 10</th></tr></thead><tbody>${mk}</tbody></table></div>
     <p class="hint" style="margin-top:8px">EV = szansa finalna × kurs − 1 (przed podatkiem). Dodatnie EV oznacza tylko, że <i>model</i> ocenia szansę wyżej niż rynek — przy niepełnych danych ta „wartość” jest złudna.</p>`;
 }
 
@@ -857,6 +857,32 @@ function calc(){
   return {sel,n,k,isSys:k<n,cs,per,stake,taxOn,total,maxGross,maxNet:net(maxGross),pAny,pProfit,ev:expNet-stake,ps};
 }
 
+// Ile razy typ „wszedłby” w ostatnich 10 meczach każdej z drużyn (z perspektywy tej drużyny)
+const HIT={
+  0:{h:g=>g.r==="W",a:g=>g.r==="L",lh:"gosp. wygrał",la:"gość przegrał"},
+  1:{h:g=>g.r==="D",a:g=>g.r==="D",lh:"gosp. remis",la:"gość remis"},
+  2:{h:g=>g.r==="L",a:g=>g.r==="W",lh:"gosp. przegrał",la:"gość wygrał"},
+  3:{h:g=>g.r!=="L",a:g=>g.r!=="W",lh:"gosp. bez porażki",la:"gość bez wygranej"},
+  4:{h:g=>g.r!=="D",a:g=>g.r!=="D",lh:"gosp. bez remisu",la:"gość bez remisu"},
+  5:{h:g=>g.r!=="W",a:g=>g.r!=="L",lh:"gosp. bez wygranej",la:"gość bez porażki"},
+  6:{h:g=>g.gf+g.ga>=2,lh:"2+ gole"}, 7:{h:g=>g.gf+g.ga<=1,lh:"0–1 gol"},
+  8:{h:g=>g.gf+g.ga>=3,lh:"3+ gole"}, 9:{h:g=>g.gf+g.ga<=2,lh:"0–2 gole"},
+  10:{h:g=>g.gf+g.ga>=4,lh:"4+ gole"}, 11:{h:g=>g.gf+g.ga<=3,lh:"0–3 gole"},
+  12:{h:g=>g.gf>0&&g.ga>0,lh:"obie strzeliły"}, 13:{h:g=>!(g.gf>0&&g.ga>0),lh:"nie obie strzeliły"}
+};
+function hit10(o,i){
+  const d=HIT[i], H=o.stats?.home?.last10, A=o.stats?.away?.last10;
+  if(!d||!H||!A||!H.length||!A.length) return null;
+  const hn=H.filter(d.h).length, an=A.filter(d.a||d.h).length;
+  return {hn,hN:H.length,an,aN:A.length,rate:(hn+an)/(H.length+A.length),lh:d.lh,la:d.la||d.lh};
+}
+function hitTxt(o,i,long){
+  const x=hit10(o,i); if(!x) return "";
+  const col=x.rate>=.6?"#16a34a":x.rate>=.4?"#ca8a04":"#dc2626";
+  return long ? `📈 ost. 10: ${x.lh} <b style="color:${col}">${x.hn}/${x.hN}</b> · ${x.la} <b style="color:${col}">${x.an}/${x.aN}</b>`
+              : `<span title="Ostatnie 10 meczów: ${x.lh} ${x.hn}/${x.hN}, ${x.la} ${x.an}/${x.aN}" style="color:${col};font-weight:600">${x.hn}/${x.hN}·${x.an}/${x.aN}</span>`;
+}
+function hitTitle(o,i){ const x=hit10(o,i); return x?` · ost. 10: ${x.lh} ${x.hn}/${x.hN}, ${x.la} ${x.an}/${x.aN}`:""; }
 function riskNote(o,i){
   const k=o.odds[i];
   if(i===1) return `<br><span style="color:#b45309">⚠️ remisy w teście: −13% stawek</span>`;
@@ -872,7 +898,7 @@ function renderSlip(){
   else{
     html+=c.sel.map((o,j)=>{const i=picks[o.id];return `
       <div class="pick">
-        <div>${esc(o.home)} – ${esc(o.away)}<small>${esc(o.league)} · ${fmtDate(o.date)}<br>typ: <b>${MK[i]}</b> · szansa ${pct(c.ps[j])}${riskNote(o,i)}</small>${bookieLinks(o)}</div>
+        <div>${esc(o.home)} – ${esc(o.away)}<small>${esc(o.league)} · ${fmtDate(o.date)}<br>typ: <b>${MK[i]}</b> · szansa ${pct(c.ps[j])}${hit10(o,i)?`<br>${hitTxt(o,i,true)}`:""}${riskNote(o,i)}</small>${bookieLinks(o)}</div>
         <b>${o.odds[i].toFixed(2)}</b>
         <button class="x" data-unpick="${o.id}" title="Usuń z kuponu">✕</button>
       </div>`}).join("");
@@ -914,9 +940,10 @@ function renderValue(){
       <td class="c num ${r.ev>0?"pos":"neg"}">${r.ev>0?"+":""}${(r.ev*100).toFixed(1)}%</td>
       <td class="c num ${r.evT>0?"pos":"neg"}">${r.evT>0?"+":""}${(r.evT*100).toFixed(1)}%</td>
       <td class="c num league">${r.mk!=null?pct(r.mk):"–"} / ${pct(r.mo)}</td>
+      <td class="c num">${hitTxt(r.o,r.i)||"–"}</td>
       <td><button class="mag" data-detail="${r.o.id}" title="Szczegóły analizy">🔍</button></td>
     </tr>`).join("")
-    : `<tr><td colspan="10" class="league" style="text-align:center;padding:16px">${offer.length?(mode==="post"?"Brak typów z dodatnim EV po podatku. To normalne: przewaga ponad 13,6% trafia się rzadko.":"Brak typów spełniających kryteria. Zwiększ wagę modelu albo obniż min. szansę."):"Ładowanie meczów…"}</td></tr>`;
+    : `<tr><td colspan="11" class="league" style="text-align:center;padding:16px">${offer.length?(mode==="post"?"Brak typów z dodatnim EV po podatku. To normalne: przewaga ponad 13,6% trafia się rzadko.":"Brak typów spełniających kryteria. Zwiększ wagę modelu albo obniż min. szansę."):"Ładowanie meczów…"}</td></tr>`;
 }
 let placeBk="sts", placeDone={};
 function renderPlace(){
