@@ -596,7 +596,7 @@ function applyRestore(){
   if(!restore) return;
   restore.picks.forEach(r=>{const o=r.id?offer.find(x=>x.id===r.id):offer.find(x=>r.k&&(x.espnId===r.k||x.afId===r.k)); if(o&&o.odds[r.i]>1&&(!o.real||o.date>Date.now())) picks[o.id]=r.i;});
   offer.forEach(o=>{const k=o.espnId||o.afId; if(k&&restore.links[k]) o.links=restore.links[k]; if(o.espnId&&restore.inj[o.espnId]&&!o.stats.injAuto){[o.stats.home.inj,o.stats.away.inj]=restore.inj[o.espnId];}});
-  if(restore.detail){const o=offer.find(x=>x.espnId===restore.detail||x.afId===restore.detail); detailId=o?o.id:null;} else detailId=null;
+  if(restore.detail){const o=offer.find(x=>x.espnId===restore.detail||x.afId===restore.detail); detailId=o?o.id:null; if(o) ensureStats(o);} else detailId=null;
   renderDetail(); render();
 }
 const pendingLg=()=>selLeagues.some(l=>LEAGUES[l]&&!AF_ONLY.has(l)&&!loadedLg.has(l));
@@ -708,6 +708,44 @@ async function afH2H(o){
     const a=homeIsHome?g.home:g.away, b=homeIsHome?g.away:g.home; a>b?h.hw++:a<b?h.aw++:h.d++;});
   o.stats.h2h=h;
 }
+// ================= STATYSTYKI MECZOWE (ostatnie mecze drużyn, ESPN) =================
+const SKEYS=["totalShots","shotsOnTarget","wonCorners","foulsCommitted","yellowCards","redCards","offsides","possessionPct"];
+async function pastStats(eid){
+  const k="st:"+eid, c=localStorage.getItem(k); if(c) return JSON.parse(c);
+  try{
+    const s=await getJSON(`${ESPN}/all/summary?event=${eid}`), out={};
+    (s.boxscore?.teams||[]).forEach(t=>{ out[t.team.id]=Object.fromEntries((t.statistics||[]).filter(x=>SKEYS.includes(x.name)).map(x=>[x.name,parseFloat(x.displayValue)||0])); });
+    if(Object.keys(out).length===2&&Object.values(out).every(x=>Object.keys(x).length)) try{localStorage.setItem(k,JSON.stringify(out))}catch{}
+    return out;
+  }catch{ return null; }
+}
+async function ensureStats(o){
+  if(o.ms||o.msLoading||!o.stats?.home?.last10||!o.stats?.away?.last10) return;
+  o.msLoading=true; if(detailId===o.id) renderDetail();
+  const side=async(games,tid)=>{ const res=await pool(games,6,g=>pastStats(g.id));
+    return res.map(st=>{ if(!st||!st[tid]) return null; const op=Object.keys(st).find(k=>k!=String(tid)); return op?{me:st[tid],op:st[op]}:null; }).filter(Boolean); };
+  const [h,a]=await Promise.all([side(o.stats.home.last10,o.homeId),side(o.stats.away.last10,o.awayId)]);
+  o.ms={h,a}; o.msLoading=false; if(detailId===o.id) renderDetail();
+}
+function statsBox(o){
+  if(!o.real||o.afOnly) return "";
+  const head='<h4>📊 Statystyki meczowe <span class="league">(średnie z ostatnich meczów: oddane / przeciwko)</span></h4>';
+  if(!o.ms) return head+`<p class="hint">⏳ Pobieram statystyki ostatnich meczów obu drużyn…</p>`;
+  const {h,a}=o.ms; if(!h.length||!a.length) return head+`<p class="hint">Brak statystyk dla tych drużyn w źródle danych.</p>`;
+  const av=(arr,f)=>arr.reduce((s,x)=>s+f(x),0)/arr.length, f1=v=>v.toFixed(1);
+  const rows=[["Strzały","totalShots"],["Strzały celne","shotsOnTarget"],["Rzuty rożne","wonCorners"],["Faule","foulsCommitted"],["Żółte kartki","yellowCards"],["Spalone","offsides"]].map(([lb,k])=>{
+    const hF=av(h,x=>x.me[k]||0), hA=av(h,x=>x.op[k]||0), aF=av(a,x=>x.me[k]||0), aA=av(a,x=>x.op[k]||0);
+    const eh=(hF+aA)/2, ea=(aF+hA)/2;
+    return `<tr><td>${lb}</td><td class="c num">${f1(hF)} <span class="league">/ ${f1(hA)}</span></td><td class="c num">${f1(aF)} <span class="league">/ ${f1(aA)}</span></td><td class="c num"><b>${f1(eh)}</b> – <b>${f1(ea)}</b> <span class="league">(razem ${f1(eh+ea)})</span></td></tr>`;}).join("");
+  const pos=`<tr><td>Posiadanie piłki</td><td class="c num">${av(h,x=>x.me.possessionPct||0).toFixed(0)}%</td><td class="c num">${av(a,x=>x.me.possessionPct||0).toFixed(0)}%</td><td></td></tr>`;
+  const tot=(g,k)=>(g.me[k]||0)+(g.op[k]||0), cards=g=>tot(g,"yellowCards")+tot(g,"redCards");
+  const th=[["Rożne w meczu 9+",g=>tot(g,"wonCorners")>=9],["Rożne w meczu 11+",g=>tot(g,"wonCorners")>=11],["Kartki w meczu 4+",g=>cards(g)>=4],["Kartki w meczu 6+",g=>cards(g)>=6],
+            ["Celne strzały w meczu 8+",g=>tot(g,"shotsOnTarget")>=8],["Strzały w meczu 25+",g=>tot(g,"totalShots")>=25],["Faule w meczu 25+",g=>tot(g,"foulsCommitted")>=25],["Drużyna: 5+ celnych strzałów",g=>(g.me.shotsOnTarget||0)>=5]];
+  const cnt=(arr,fn)=>{const n=arr.filter(fn).length,r=n/arr.length,col=r>=.6?"#16a34a":r>=.4?"#ca8a04":"#dc2626";return `<b style="color:${col}">${n}/${arr.length}</b>`};
+  return head+`<div class="scroll"><table><thead><tr><th></th><th class="c">${esc(o.home)}</th><th class="c">${esc(o.away)}</th><th class="c">Prognoza na ten mecz</th></tr></thead><tbody>${rows}${pos}</tbody></table></div>
+    <div class="tips" style="margin-top:8px">${th.map(([lb,fn])=>`<div class="tip" style="padding:7px 10px"><b style="display:inline">${lb}</b><br>gosp. ${cnt(h,fn)} · gość ${cnt(a,fn)}</div>`).join("")}</div>
+    <p class="hint" style="margin-top:6px">Z ${h.length} meczów gospodarza i ${a.length} meczów gościa. Prognoza = średnia z tego, co drużyna oddaje, i tego, co rywal zwykle dopuszcza. Na rynki rożnych, kartek i strzałów nie ma tu kursów — porównaj u bukmachera. Dane ESPN mogą mieć pojedyncze braki.</p>`;
+}
 function afBox(o){
   if(!o.afId) return "";
   const inj=side=>{const l=o.stats[side].injList||[];return l.length?l.map(p=>`<div>${/missing/i.test(p.type||"")?"❌":"❓"} ${esc(p.name)} <span class="league">— ${esc(p.reason||p.type||"")}</span></div>`).join(""):'<div class="league">brak zgłoszonych</div>'};
@@ -785,6 +823,7 @@ function renderDetail(){
   el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🔍 Analiza: ${esc(o.home)} – ${esc(o.away)}</h2><button class="sec" id="closeDetail">Zamknij</button></div>
     ${o.real?`<p class="hint">🏟 ${esc(o.venue||"stadion nieznany")}${o.city?", "+esc(o.city):""} · ${fmtDate(o.date)}${o.neutral?" · teren neutralny":""}${o.espnId?` · <a href="https://www.espn.com/soccer/match/_/gameId/${o.espnId}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">mecz na ESPN</a>`:""}</p>`:""}
     ${lineupBox(o)}
+    ${statsBox(o)}
     ${afBox(o)}
     ${o.news?.length?`<h4>📰 Newsy drużyn (sprawdź kontuzje i absencje)</h4><ul class="hint" style="margin:0 0 6px;padding-left:18px">${o.news.map(n=>`<li>${n.u?`<a href="${esc(n.u)}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">${esc(n.t)}</a>`:esc(n.t)}</li>`).join("")}</ul>`:""}
     <h4>Zmienne wejściowe ${o.real?'<span class="league">(pobrane automatycznie — możesz poprawić)</span>':""}</h4>
@@ -1052,7 +1091,7 @@ document.addEventListener("click",e=>{
     t.disabled=true; t.textContent="⏳ pobieram…";
     (t.dataset.afodds?afOdds(o):afH2H(o)).then(()=>{renderDetail();render()}).catch(err=>{t.textContent="⚠️ "+err.message}); return; }
   if(t.id==="closeDetail"){detailId=null;renderDetail();renderOffer();return}
-  if(t.dataset.detail){detailId=+t.dataset.detail; const lo=offer.find(x=>x.id===detailId); if(lo&&lo.lazy){lo.lazy=false; loadSummary(lo).then(()=>{renderDetail();render()});} renderDetail();renderOffer();$("detail").scrollIntoView({behavior:"smooth"});return}
+  if(t.dataset.detail){detailId=+t.dataset.detail; const lo=offer.find(x=>x.id===detailId); if(lo&&lo.lazy){lo.lazy=false; loadSummary(lo).then(()=>{renderDetail();render()});} if(lo) ensureStats(lo); renderDetail();renderOffer();$("detail").scrollIntoView({behavior:"smooth"});return}
   if(t.dataset.del){const id=+t.dataset.del;offer=offer.filter(o=>o.id!==id);delete picks[id];if(detailId===id){detailId=null;renderDetail()}render();return}
   if(t.dataset.unpick){delete picks[+t.dataset.unpick];render();return}
   if(t.dataset.id){const id=+t.dataset.id,i=+t.dataset.i;picks[id]===i?delete picks[id]:picks[id]=i;render()}
