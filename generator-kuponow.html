@@ -63,6 +63,7 @@
   .note{color:var(--mut);font-size:12px;line-height:1.5}
   .dhead .dact{margin-left:auto;display:flex;gap:6px}
   .warn{color:#f59e0b;font-weight:600;white-space:nowrap}
+  .oddsHint{color:#93c5fd;font-size:12px;line-height:1.5;margin:10px 0 0;background:#0f1d2b;border:1px solid #1e3a5f;border-radius:8px;padding:8px 10px}
   .stars{color:#facc15;letter-spacing:1px;font-size:13px;white-space:nowrap;cursor:help}
   .stars .off{color:#334155}
   .dbl.best{border-color:#facc15;box-shadow:0 0 0 1px #facc15 inset}
@@ -117,13 +118,14 @@
       <label class="chk" title="Pomija kursy orientacyjne i szacowane"><input type="checkbox" id="onlyReal"> tylko kursy bukmachera</label>
       <label class="chk" title="Pomija typy, przy których model i rynek różnią się o ponad 15 pkt proc. — w teście takie typy traciły najwięcej"><input type="checkbox" id="skipWarn" checked> pomijaj typy z rozjazdem model/rynek</label>
     </div>
+    <p class="oddsHint" id="oddsHint"></p>
     <details style="margin-top:12px"><summary>Rynki w dublach</summary><div id="fams"></div></details>
   </section>
 
   <section class="panel" id="topBox" style="display:none">
-    <div class="tbar"><h2 style="margin:0;font-size:15px">⭐ Najpewniejsze typy według analizy</h2><span class="note">kurs od 1,25 · różne mecze</span></div>
+    <div class="tbar"><h2 style="margin:0;font-size:15px">⭐ Najpewniejsze typy według analizy</h2><span class="note">kurs od 1,25 · różne mecze · szansa + jakość</span></div>
     <div id="topPicks" style="margin-top:8px"></div>
-    <p class="note" style="margin:6px 0 0">„Najpewniejsze” = najwyższa szansa przy zgodnych źródłach (rynek, ostatnie mecze, model) i prawdziwym kursie. To nadal nie pewniaki — typ z 4 gwiazdkami przegrywa mniej więcej co 4. raz.</p>
+    <p class="note" style="margin:6px 0 0">Kolejność: najwyższa szansa przy dobrej <b>jakości</b> (★ = na ile ostatnie wyniki, model i kurs bukmachera potwierdzają typ). Szansa wynika z kursu — typ z szansą 75% przegrywa mniej więcej co 4. raz, niezależnie od gwiazdek.</p>
   </section>
   <div id="pinBar"></div>
   <div id="doubles"></div>
@@ -708,22 +710,27 @@ function legsFor(o){
   const onlyReal=$("onlyReal").checked, skipWarn=$("skipWarn").checked;
   return out.filter(l=>l.odd>=1.04&&l.odd<=5&&(!onlyReal||l.src==="api"||l.src==="manual")&&(!skipWarn||!l.warn));
 }
-// Ocena pewności „według analizy”: szansa pomniejszona o niezgodność źródeł, kurs szacowany i małą próbkę.
-function conf(l){
-  if(l._c!=null) return l._c;
-  const vals=[l.pMarket??l.p,l.emp,l.pModel].filter(v=>v!=null), spread=vals.length>1?Math.max(...vals)-Math.min(...vals):0;
-  const n=l.hit?l.hit.hN+l.hit.aN:0;
-  let c=l.p-Math.max(0,spread-0.10)*0.5;
-  if(l.src==="est") c-=0.03;
-  if(n<12) c-=0.02;
-  if(l.warn) c-=0.05;
-  return l._c=clamp(c,0.01,0.99);
+// Ocena JAKOŚCI typu (0–100) — niezależna od kursu. Szansa wynika z kursu (przy kursie 3 zawsze ok. 30%),
+// a jakość mówi, czy inne dane ten typ potwierdzają: ostatnie wyniki, model, prawdziwy kurs, wielkość próbki.
+function qual(l){
+  if(l._q!=null) return l._q;
+  const base=l.pMarket??(l.sp?l.sp.pPois:l.p), n=l.hit?l.hit.hN+l.hit.aN:0, why=[];
+  let q=60;
+  if(l.emp!=null){ const d=l.emp-base, v=clamp(d*120,-30,15); q+=v;
+    why.push(d>=0.05?`ostatnie wyniki potwierdzają (${pc(l.emp)} wobec ${pc(base)})`:d<=-0.05?`ostatnie wyniki słabsze (${pc(l.emp)} wobec ${pc(base)})`:"ostatnie wyniki zgodne z szansą"); }
+  if(l.pModel!=null&&l.pMarket!=null){ const d=l.pModel-l.pMarket;
+    if(Math.abs(d)>DISAGREE){ q-=20; why.push(`model odbiega od rynku o ${Math.round(Math.abs(d)*100)} pkt`); }
+    else { q+=clamp(d*60,-10,6); why.push(d>=0.03?"model potwierdza":d<=-0.03?"model lekko przeciw":"model zgodny"); } }
+  if(l.src==="api"||l.src==="manual"){ q+=10; why.push("kurs bukmachera"); } else if(l.src==="est"){ q-=15; why.push("kurs tylko szacowany"); }
+  if(n&&n<12){ q-=10; why.push(`mało meczów w danych (${n})`); } else if(n>=16) q+=4;
+  l._why=why.join(" · ");
+  return l._q=Math.round(clamp(q,0,100));
 }
-const confWhy=l=>{ const r=[]; const vals=[l.pMarket??l.p,l.emp,l.pModel].filter(v=>v!=null), spread=vals.length>1?Math.max(...vals)-Math.min(...vals):0;
-  r.push(spread<=0.10?"źródła zgodne":`źródła różnią się o ${Math.round(spread*100)} pkt`); if(l.src==="est") r.push("kurs szacowany"); if((l.hit?l.hit.hN+l.hit.aN:0)<12) r.push("mała próbka meczów"); if(l.warn) r.push("rozjazd model/rynek"); return r.join(", "); };
-const starsLeg=c=>c>=.80?5:c>=.70?4:c>=.60?3:c>=.50?2:1, starsDbl=c=>c>=.55?5:c>=.45?4:c>=.35?3:c>=.25?2:1;
+const qWhy=l=>{ qual(l); return l._why||""; };
+const starsQ=q=>q>=85?5:q>=70?4:q>=55?3:q>=40?2:1;
+const dblQ=(a,b)=>Math.round(Math.min((qual(a)+qual(b))/2,Math.min(qual(a),qual(b))+15));
 const starHtml=(n,t)=>`<span class="stars" title="${esc(t)}">${"★".repeat(n)}<span class="off">${"★".repeat(5-n)}</span></span>`;
-const score=l=>conf(l);    // ranking dubli wg oceny pewności (szansa + zgodność źródeł, kara za kurs szacowany)
+const score=l=>l.p*(0.75+0.25*qual(l)/100);   // przy podobnej szansie wygrywa typ lepiej potwierdzony przez dane
 
 // ---------- przypięty typ ----------
 let pinned=JSON.parse(localStorage.getItem("pinned")||"null");
@@ -808,7 +815,8 @@ function explainLeg(l){
 }
 function explainDouble(d,legs,t,p,minT){
   return [`<b>Dlaczego ten dubel:</b> spośród wszystkich par z różnych meczów i różnych rynków, z kursem łącznym ${minT?`co najmniej ${minT.toFixed(2)}`:"w zadanym zakresie"}, ta ma jedną z najwyższych szans trafienia.`,
-    `<b>Szansa ${pct(p)}</b> = ${pct(legs[0].p)} × ${pct(legs[1].p)} (mecze są niezależne). Czyli średnio ${Math.round((1-p)*10)} na 10 takich dubli przegrywa.`,
+    `<b>Szansa ${pct(p)}</b> = ${pct(legs[0].p)} × ${pct(legs[1].p)} (mecze są niezależne). Czyli średnio ${Math.round((1-p)*10)} na 10 takich dubli przegrywa. Przy kursie ${t.toFixed(2)} każdy dubel ma podobną szansę — kurs to cena prawdopodobieństwa.`,
+    `<b>Jakość ${dblQ(legs[0],legs[1])}/100</b> (★): czy ostatnie wyniki, model i kursy potwierdzają oba typy. Przy tej samej szansie lepiej wybrać dubel z wyższą jakością.`,
     `<b>Wypłata</b> = stawka × 0,88 (podatek 12%) × kurs ${t.toFixed(2)}${payout(t)>2280?" − 10% podatku od wygranej powyżej 2280 zł":""}.`,
     legs.some(l=>l.src==="ref"||l.src==="est")?`<span style="color:#f59e0b">≈ Część kursów jest orientacyjna lub szacowana — wpisz kurs z ${BKNAME[BK]}, a dubel się przeliczy.</span>`:`Kursy: ${BKNAME[BK]}.`].join("<br>");
 }
@@ -817,22 +825,22 @@ function bkLink(o){
   const b=BOOKIES.find(x=>x.key===BK), url=b.leagues[o.league]||b.home;
   return `<a class="go" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(b.name)}: ${b.leagues[o.league]?"liga "+esc(o.league)+" — znajdź mecz":"oferta piłkarska"}">${esc(b.name)} ↗</a>`;
 }
-function liveLegs(d){ return [d.A,d.B].map(l=>{const od=oddsFor(l.o,l.key,l.p)||{k:l.odd,src:l.src}; return {...l,odd:od.k,src:od.src,_c:null};}); }
+function liveLegs(d){ return [d.A,d.B].map(l=>{const od=oddsFor(l.o,l.key,l.p)||{k:l.odd,src:l.src}; return {...l,odd:od.k,src:od.src,_q:null,_why:null};}); }
 function renderDoubles(){
   const el=$("doubles");
   if(!lastGen){ el.innerHTML=""; return; }
   if(!lastGen.length){ el.innerHTML=`<div class="empty">Nie znaleziono dubli w tym zakresie kursu. Rozszerz zakres, dodaj ligi, dni albo rynki.</div>`; return; }
-  const bestIdx=lastGen.reduce((b,d,i,arr)=>conf(d.A)*conf(d.B)>conf(arr[b].A)*conf(arr[b].B)?i:b,0);
+  const bestIdx=lastGen.reduce((b,d,i,arr)=>dblQ(d.A,d.B)+d.p*20>dblQ(arr[b].A,arr[b].B)+arr[b].p*20?i:b,0);
   el.innerHTML=lastGen.map((d,n)=>{
     const legs=liveLegs(d), t=legs[0].odd*legs[1].odd, p=legs[0].p*legs[1].p, approx=legs.some(l=>l.src==="ref"||l.src==="est");
-    const dc=conf(d.A)*conf(d.B), best=n===bestIdx;
+    const dq=dblQ(legs[0],legs[1]), best=n===bestIdx;
     return `<div class="dbl ${best?"best":""}">${best?`<div class="bestTag">🏆 Najpewniejszy według analizy</div>`:""}
       <div class="dhead"><span class="dn">#${n+1}</span>${tip(explainDouble(d,legs,t,p,parseFloat(String($("dMin").value).replace(",","."))||0),"l")}<span>Kurs <b>${t.toFixed(2)}</b>${approx?' <span class="approx" title="Zawiera kurs orientacyjny lub szacowany — sprawdź u bukmachera">≈</span>':""}</span>
-        <span>Szansa <b style="color:${p>=.5?"#16a34a":p>=.35?"#ca8a04":"#dc2626"}">${pct(p)}</b></span><span>Pewność ${starHtml(starsDbl(dc),`Ocena pewności dubla: ${pct(dc)} (szansa obu typów skorygowana o zgodność źródeł)`)}</span><span>Wypłata <b>${zl(payout(t))}</b></span>
+        <span>Szansa <b style="color:${p>=.5?"#16a34a":p>=.35?"#ca8a04":"#dc2626"}">${pct(p)}</b></span><span>Jakość ${starHtml(starsQ(dq),`Jakość dubla: ${dq}/100 — na ile dane (ostatnie wyniki, model, kursy) potwierdzają oba typy. Nie zależy od kursu.`)}</span><span>Wypłata <b>${zl(payout(t))}</b></span>
         <span class="dact"><button class="sec sm" data-save="${n}" title="Zapisz do historii — wynik sprawdzi się sam po meczach">💾 Zapisz</button><button class="sec sm" data-copy="${n}">📋 Kopiuj</button></span></div>
       ${legs.map((l,j)=>`<div class="leg ${isPinned(l)?"pinned":""}">
         <div class="lm"><b>${esc(l.o.home)} – ${esc(l.o.away)}</b> <span class="league">${esc(l.o.league)} · ${fmtDate(l.o.date)}</span></div>
-        <div class="lt"><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> · szansa ${pct(l.p)} ${starHtml(starsLeg(conf(l)),`Ocena pewności: ${pct(conf(l))} — ${confWhy(l)}`)} ${tip(explainLeg(l))}
+        <div class="lt"><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> · szansa ${pct(l.p)} ${starHtml(starsQ(qual(l)),`Jakość typu: ${qual(l)}/100 — ${qWhy(l)}`)} ${tip(explainLeg(l))}
           <div class="league sig">${signals(l)}</div></div>
         <div class="lk"><input class="odd-in src-${l.src}" type="number" step="0.01" min="1.01" value="${l.odd.toFixed(2)}" data-dn="${n}" data-leg="${j}" title="${SRC[l.src]}">
           <div class="league">${SRCSHORT(l.src)} · min. <b title="Kurs uczciwy (1 / szansa). Niższy kurs u bukmachera = typ średnio traci, nawet przed podatkiem.">${(1/l.p).toFixed(2)}</b></div></div>
@@ -897,19 +905,24 @@ function renderHist(){
   $("histSum").innerHTML=n?`Rozliczone: <b>${n}</b> · trafione <b>${w}</b> (${Math.round(100*w/n)}%) · bilans <b style="color:${ret-staked>=0?"#16a34a":"#dc2626"}">${ret-staked>=0?"+":""}${zl(ret-staked)}</b> (po podatku)`:"Czekam na wyniki meczów…";
 }
 
+function renderOddsHint(){
+  const m=parseFloat(String($("dMin").value).replace(",","."))||0;
+  $("oddsHint").innerHTML=m>1?`ℹ️ Przy kursie od <b>${m.toFixed(2)}</b> każdy dubel ma ok. <b>${Math.round(91/m)}%</b> szansy — kurs to cena prawdopodobieństwa (minus marża), więc przy tym kursie wyżej się nie da. Chcesz większą szansę — obniż kurs. <b>★ Jakość</b> pokazuje, które dublety najlepiej potwierdzają dane.`:"";
+}
 // ---------- filtry, zdarzenia ----------
 let topList=[];
 function renderTop(){
   const now=Date.now(), win=+$("startWin").value||0;
-  const legs=visible().filter(o=>o.date>now&&(!win||o.date-now<=win*36e5)).flatMap(legsFor).filter(l=>l.odd>=1.25);
-  legs.sort((a,b)=>conf(b)-conf(a));
+  const legs=visible().filter(o=>o.date>now&&(!win||o.date-now<=win*36e5)).flatMap(legsFor).filter(l=>l.odd>=1.25&&qual(l)>=55);
+  legs.sort((a,b)=>score(b)-score(a));   // szansa i jakość razem
   const seen=new Set(); topList=[];
-  for(const l of legs){ if(seen.has(l.o.id)) continue; seen.add(l.o.id); topList.push(l); if(topList.length>=5) break; }
+  const famN={};
+  for(const l of legs){ if(seen.has(l.o.id)||(famN[l.key]||0)>=2) continue; seen.add(l.o.id); famN[l.key]=(famN[l.key]||0)+1; topList.push(l); if(topList.length>=5) break; }
   $("topBox").style.display=topList.length?"":"none";
   $("topPicks").innerHTML=topList.map((l,i)=>`<div class="tp">
     <span class="tpn">${i+1}</span>
     <div><b>${esc(l.o.home)} – ${esc(l.o.away)}</b> <span class="league">${esc(l.o.league)} · ${fmtDate(l.o.date)}</span>
-      <div><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> @ ${l.odd.toFixed(2)} <span class="league">(${SRCSHORT(l.src)})</span> · szansa ${pct(l.p)} ${starHtml(starsLeg(conf(l)),`Ocena pewności: ${pct(conf(l))} — ${confWhy(l)}`)} ${tip(explainLeg(l))}</div></div>
+      <div><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> @ ${l.odd.toFixed(2)} <span class="league">(${SRCSHORT(l.src)})</span> · szansa ${pct(l.p)} ${starHtml(starsQ(qual(l)),`Jakość typu: ${qual(l)}/100 — ${qWhy(l)}`)} ${tip(explainLeg(l))}</div></div>
     <button class="sec sm" data-toppin="${i}" title="Przypnij i dobierz drugi typ do dubla">📌 Dobierz drugi typ</button></div>`).join("");
 }
 function render(){ renderFilters(); renderPin(); renderTop(); renderDoubles(); }
@@ -952,6 +965,7 @@ function renderBk(){ document.querySelectorAll("[data-bk]").forEach(b=>b.classLi
 const famSaved=JSON.parse(localStorage.getItem("fams")||"null");
 $("fams").innerHTML=Object.entries(FAM).map(([k,n])=>`<label class="chk"><input type="checkbox" data-fam="${k}" ${!famSaved||famSaved.includes(k)?"checked":""}> ${n}</label>`).join("");
 $("gen").onclick=generate;
+$("dMin").addEventListener("input",renderOddsHint); renderOddsHint();
 $("stake").oninput=renderDoubles;
 ["onlyReal","skipWarn","startWin"].forEach(id=>$(id).onchange=()=>{ localStorage.setItem("opt:"+id,$(id).type==="checkbox"?($(id).checked?"1":"0"):$(id).value); if(lastGen) generate(); });
 if(localStorage.getItem("opt:skipWarn")==="0") $("skipWarn").checked=false;
