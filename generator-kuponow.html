@@ -63,6 +63,14 @@
   .note{color:var(--mut);font-size:12px;line-height:1.5}
   .dhead .dact{margin-left:auto;display:flex;gap:6px}
   .warn{color:#f59e0b;font-weight:600;white-space:nowrap}
+  .stars{color:#facc15;letter-spacing:1px;font-size:13px;white-space:nowrap;cursor:help}
+  .stars .off{color:#334155}
+  .dbl.best{border-color:#facc15;box-shadow:0 0 0 1px #facc15 inset}
+  .bestTag{background:#facc15;color:#1a1400;font-weight:800;font-size:12px;padding:4px 14px;border-radius:13px 13px 0 0}
+  .dbl.best .dhead{border-radius:0}
+  .tp{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+  .tpn{width:24px;height:24px;border-radius:50%;background:#facc15;color:#1a1400;font-weight:800;display:grid;place-items:center;font-size:12px}
+  @media(max-width:700px){.tp{grid-template-columns:26px 1fr}.tp button{grid-column:2}}
   .sig b{color:var(--txt)}
   .pin{background:#1f2a1a;border:1px solid #3f6212;color:#d9f99d;border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .pinb{background:transparent;padding:4px 6px;font-size:15px;opacity:.45;filter:grayscale(1)}
@@ -112,6 +120,11 @@
     <details style="margin-top:12px"><summary>Rynki w dublach</summary><div id="fams"></div></details>
   </section>
 
+  <section class="panel" id="topBox" style="display:none">
+    <div class="tbar"><h2 style="margin:0;font-size:15px">⭐ Najpewniejsze typy według analizy</h2><span class="note">kurs od 1,25 · różne mecze</span></div>
+    <div id="topPicks" style="margin-top:8px"></div>
+    <p class="note" style="margin:6px 0 0">„Najpewniejsze” = najwyższa szansa przy zgodnych źródłach (rynek, ostatnie mecze, model) i prawdziwym kursie. To nadal nie pewniaki — typ z 4 gwiazdkami przegrywa mniej więcej co 4. raz.</p>
+  </section>
   <div id="pinBar"></div>
   <div id="doubles"></div>
 
@@ -672,7 +685,7 @@ async function loadAllStats(){
   await pool(list,3,async o=>{ await ensureStats(o); done++; $("statsStatus").textContent=`📊 statystyki meczowe: ${done}/${list.length}`; });
   const n=offer.filter(o=>o.ms).length;
   $("statsStatus").textContent=n?`📊 rożne / kartki / celne strzały: ${n} meczów (do ${STAT_DAYS} dni naprzód)`:"";
-  statsRunning=false; if(lastGen) generate();
+  statsRunning=false; renderTop(); if(lastGen) generate();
 }
 
 // ---------- kandydaci (typy) ----------
@@ -695,7 +708,22 @@ function legsFor(o){
   const onlyReal=$("onlyReal").checked, skipWarn=$("skipWarn").checked;
   return out.filter(l=>l.odd>=1.04&&l.odd<=5&&(!onlyReal||l.src==="api"||l.src==="manual")&&(!skipWarn||!l.warn));
 }
-const score=l=>l.p*(l.src==="est"?EST_PENALTY:1);    // 2) typy z kursem szacowanym przegrywają przy podobnej szansie
+// Ocena pewności „według analizy”: szansa pomniejszona o niezgodność źródeł, kurs szacowany i małą próbkę.
+function conf(l){
+  if(l._c!=null) return l._c;
+  const vals=[l.pMarket??l.p,l.emp,l.pModel].filter(v=>v!=null), spread=vals.length>1?Math.max(...vals)-Math.min(...vals):0;
+  const n=l.hit?l.hit.hN+l.hit.aN:0;
+  let c=l.p-Math.max(0,spread-0.10)*0.5;
+  if(l.src==="est") c-=0.03;
+  if(n<12) c-=0.02;
+  if(l.warn) c-=0.05;
+  return l._c=clamp(c,0.01,0.99);
+}
+const confWhy=l=>{ const r=[]; const vals=[l.pMarket??l.p,l.emp,l.pModel].filter(v=>v!=null), spread=vals.length>1?Math.max(...vals)-Math.min(...vals):0;
+  r.push(spread<=0.10?"źródła zgodne":`źródła różnią się o ${Math.round(spread*100)} pkt`); if(l.src==="est") r.push("kurs szacowany"); if((l.hit?l.hit.hN+l.hit.aN:0)<12) r.push("mała próbka meczów"); if(l.warn) r.push("rozjazd model/rynek"); return r.join(", "); };
+const starsLeg=c=>c>=.80?5:c>=.70?4:c>=.60?3:c>=.50?2:1, starsDbl=c=>c>=.55?5:c>=.45?4:c>=.35?3:c>=.25?2:1;
+const starHtml=(n,t)=>`<span class="stars" title="${esc(t)}">${"★".repeat(n)}<span class="off">${"★".repeat(5-n)}</span></span>`;
+const score=l=>conf(l);    // ranking dubli wg oceny pewności (szansa + zgodność źródeł, kara za kurs szacowany)
 
 // ---------- przypięty typ ----------
 let pinned=JSON.parse(localStorage.getItem("pinned")||"null");
@@ -734,7 +762,7 @@ function generate(){
     pick.push(pr); [ma,mb,ka,kb,fp].forEach(x=>use.set(x,(use.get(x)||0)+1)); if(pick.length>=N) break;
   }
   pinMissing=!!(pinned&&!pin);
-  lastGen=pinMissing?[]:pick; renderPin(); renderDoubles();
+  lastGen=pinMissing?[]:pick; renderPin(); renderTop(); renderDoubles();
 }
 function stakeVal(){ return Math.max(0,parseFloat($("stake").value)||0); }
 function payout(t,s=stakeVal()){ const g=s*0.88*t; return g>2280?g*0.9:g; }
@@ -789,20 +817,22 @@ function bkLink(o){
   const b=BOOKIES.find(x=>x.key===BK), url=b.leagues[o.league]||b.home;
   return `<a class="go" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(b.name)}: ${b.leagues[o.league]?"liga "+esc(o.league)+" — znajdź mecz":"oferta piłkarska"}">${esc(b.name)} ↗</a>`;
 }
-function liveLegs(d){ return [d.A,d.B].map(l=>{const od=oddsFor(l.o,l.key,l.p)||{k:l.odd,src:l.src}; return {...l,odd:od.k,src:od.src};}); }
+function liveLegs(d){ return [d.A,d.B].map(l=>{const od=oddsFor(l.o,l.key,l.p)||{k:l.odd,src:l.src}; return {...l,odd:od.k,src:od.src,_c:null};}); }
 function renderDoubles(){
   const el=$("doubles");
   if(!lastGen){ el.innerHTML=""; return; }
   if(!lastGen.length){ el.innerHTML=`<div class="empty">Nie znaleziono dubli w tym zakresie kursu. Rozszerz zakres, dodaj ligi, dni albo rynki.</div>`; return; }
+  const bestIdx=lastGen.reduce((b,d,i,arr)=>conf(d.A)*conf(d.B)>conf(arr[b].A)*conf(arr[b].B)?i:b,0);
   el.innerHTML=lastGen.map((d,n)=>{
     const legs=liveLegs(d), t=legs[0].odd*legs[1].odd, p=legs[0].p*legs[1].p, approx=legs.some(l=>l.src==="ref"||l.src==="est");
-    return `<div class="dbl">
+    const dc=conf(d.A)*conf(d.B), best=n===bestIdx;
+    return `<div class="dbl ${best?"best":""}">${best?`<div class="bestTag">🏆 Najpewniejszy według analizy</div>`:""}
       <div class="dhead"><span class="dn">#${n+1}</span>${tip(explainDouble(d,legs,t,p,parseFloat(String($("dMin").value).replace(",","."))||0),"l")}<span>Kurs <b>${t.toFixed(2)}</b>${approx?' <span class="approx" title="Zawiera kurs orientacyjny lub szacowany — sprawdź u bukmachera">≈</span>':""}</span>
-        <span>Szansa <b style="color:${p>=.5?"#16a34a":p>=.35?"#ca8a04":"#dc2626"}">${pct(p)}</b></span><span>Wypłata <b>${zl(payout(t))}</b></span>
+        <span>Szansa <b style="color:${p>=.5?"#16a34a":p>=.35?"#ca8a04":"#dc2626"}">${pct(p)}</b></span><span>Pewność ${starHtml(starsDbl(dc),`Ocena pewności dubla: ${pct(dc)} (szansa obu typów skorygowana o zgodność źródeł)`)}</span><span>Wypłata <b>${zl(payout(t))}</b></span>
         <span class="dact"><button class="sec sm" data-save="${n}" title="Zapisz do historii — wynik sprawdzi się sam po meczach">💾 Zapisz</button><button class="sec sm" data-copy="${n}">📋 Kopiuj</button></span></div>
       ${legs.map((l,j)=>`<div class="leg ${isPinned(l)?"pinned":""}">
         <div class="lm"><b>${esc(l.o.home)} – ${esc(l.o.away)}</b> <span class="league">${esc(l.o.league)} · ${fmtDate(l.o.date)}</span></div>
-        <div class="lt"><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> · szansa ${pct(l.p)} ${tip(explainLeg(l))}
+        <div class="lt"><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> · szansa ${pct(l.p)} ${starHtml(starsLeg(conf(l)),`Ocena pewności: ${pct(conf(l))} — ${confWhy(l)}`)} ${tip(explainLeg(l))}
           <div class="league sig">${signals(l)}</div></div>
         <div class="lk"><input class="odd-in src-${l.src}" type="number" step="0.01" min="1.01" value="${l.odd.toFixed(2)}" data-dn="${n}" data-leg="${j}" title="${SRC[l.src]}">
           <div class="league">${SRCSHORT(l.src)} · min. <b title="Kurs uczciwy (1 / szansa). Niższy kurs u bukmachera = typ średnio traci, nawet przed podatkiem.">${(1/l.p).toFixed(2)}</b></div></div>
@@ -868,15 +898,30 @@ function renderHist(){
 }
 
 // ---------- filtry, zdarzenia ----------
-function render(){ renderFilters(); renderPin(); renderDoubles(); }
+let topList=[];
+function renderTop(){
+  const now=Date.now(), win=+$("startWin").value||0;
+  const legs=visible().filter(o=>o.date>now&&(!win||o.date-now<=win*36e5)).flatMap(legsFor).filter(l=>l.odd>=1.25);
+  legs.sort((a,b)=>conf(b)-conf(a));
+  const seen=new Set(); topList=[];
+  for(const l of legs){ if(seen.has(l.o.id)) continue; seen.add(l.o.id); topList.push(l); if(topList.length>=5) break; }
+  $("topBox").style.display=topList.length?"":"none";
+  $("topPicks").innerHTML=topList.map((l,i)=>`<div class="tp">
+    <span class="tpn">${i+1}</span>
+    <div><b>${esc(l.o.home)} – ${esc(l.o.away)}</b> <span class="league">${esc(l.o.league)} · ${fmtDate(l.o.date)}</span>
+      <div><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> @ ${l.odd.toFixed(2)} <span class="league">(${SRCSHORT(l.src)})</span> · szansa ${pct(l.p)} ${starHtml(starsLeg(conf(l)),`Ocena pewności: ${pct(conf(l))} — ${confWhy(l)}`)} ${tip(explainLeg(l))}</div></div>
+    <button class="sec sm" data-toppin="${i}" title="Przypnij i dobierz drugi typ do dubla">📌 Dobierz drugi typ</button></div>`).join("");
+}
+function render(){ renderFilters(); renderPin(); renderTop(); renderDoubles(); }
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-day],[data-bk],[data-save],[data-copy],[data-pin],[data-hdel],#unpin"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-bk],[data-save],[data-copy],[data-pin],[data-toppin],[data-hdel],#unpin"); if(!t) return;
   if(t.id==="unpin"){ pinned=null; localStorage.removeItem("pinned"); generate(); return; }
   if(t.dataset.day){ const k=t.dataset.day; if(k==="all") selDays.clear(); else selDays.has(k)?selDays.delete(k):selDays.add(k); renderFilters(); if(lastGen) generate(); return; }
   if(t.dataset.bk){ BK=t.dataset.bk; localStorage.setItem("bk",BK); renderBk(); afBookOdds(BK); if(lastGen) generate(); return; }
   if(t.dataset.save){ const d=lastGen?.[+t.dataset.save]; if(d){ saveDouble(d); t.textContent="✓ Zapisano"; t.disabled=true; } return; }
   if(t.dataset.copy){ const d=lastGen?.[+t.dataset.copy]; if(!d) return; const txt=doubleText(d);
     navigator.clipboard.writeText(txt).then(()=>{t.textContent="✓ Skopiowano";setTimeout(()=>t.textContent="📋 Kopiuj",1500)}).catch(()=>prompt("Skopiuj:",txt)); return; }
+  if(t.dataset.toppin){ const l=topList[+t.dataset.toppin]; if(!l) return; pinned={m:matchKey(l.o),k:l.key}; localStorage.setItem("pinned",JSON.stringify(pinned)); generate(); $("pinBar").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   if(t.dataset.pin){ const [n,j]=t.dataset.pin.split(":").map(Number), l=[lastGen[n].A,lastGen[n].B][j];
     pinned=isPinned(l)?null:{m:matchKey(l.o),k:l.key}; pinned?localStorage.setItem("pinned",JSON.stringify(pinned)):localStorage.removeItem("pinned"); generate(); return; }
   if(t.dataset.hdel){ hist=hist.filter(h=>String(h.id)!==t.dataset.hdel); saveHist(); renderHist(); }
