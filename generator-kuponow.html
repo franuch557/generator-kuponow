@@ -3,109 +3,165 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Generator dubli</title>
+<title>Generator kuponów</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f1720;--panel:#17212d;--line:#263445;--txt:#e6edf3;--mut:#8b9bb0;--acc:#22c55e}
+  :root{
+    --paper:#E9EEF2; --card:#FFFFFF; --ink:#14213D; --ink2:#55637A; --line:#D6DEE6; --line2:#EDF1F5;
+    --turf:#1E7A4C; --turf-soft:#E2F2E9; --amber:#B86E0B; --amber-soft:#FCF0DC; --red:#C0392B; --sky:#1D6FB8;
+    --num:"Barlow Condensed",system-ui,sans-serif;
+  }
   *{box-sizing:border-box}
-  body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
-  header{display:flex;align-items:baseline;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
-  header h1{margin:0;font-size:20px} header span{color:var(--mut);font-size:13px}
-  main{max-width:980px;margin:auto;padding:16px 20px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+  body{margin:0;font:15px/1.45 "Barlow",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--paper);color:var(--ink)}
+  a{color:var(--sky)}
+  header.top{max-width:940px;margin:0 auto;padding:22px 20px 6px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header.top h1{margin:0;font:700 30px/1 var(--num);letter-spacing:.01em}
+  header.top p{margin:0;color:var(--ink2);font-size:14px}
+  main{max-width:940px;margin:auto;padding:10px 20px 40px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .panel h2{margin:0;font:700 19px/1.2 var(--num)}
+  .ph{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
   .tbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
   .seg{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-  label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:4px}
-  label.chk{flex-direction:row;align-items:center;gap:6px}
-  input,select{background:#0c131b;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px}
-  button{background:var(--acc);color:#04210f;border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;font-size:14px}
-  button.sec{background:#243244;color:var(--txt);font-weight:600}
-  button.sm{padding:6px 10px;font-size:13px}
-  button:hover{filter:brightness(1.1)}
+  label{font-size:13px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+  label.chk,label.inl{flex-direction:row;align-items:center;gap:7px;color:var(--ink)}
+  input,select{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font:500 15px "Barlow",sans-serif}
+  input:focus,select:focus,button:focus-visible,.ti:focus{outline:2px solid var(--sky);outline-offset:1px}
+  input[type=checkbox]{accent-color:var(--turf);width:16px;height:16px}
+  button{background:var(--turf);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:600 15px "Barlow",sans-serif;cursor:pointer}
+  button:hover{filter:brightness(1.07)}
+  button.sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  button.sec:hover{background:var(--line2);filter:none}
+  button.sm{padding:6px 11px;font-size:14px}
+  .note{color:var(--ink2);font-size:13px;line-height:1.5}
+  .league{font-size:12.5px;color:var(--ink2)}
+  details summary{cursor:pointer;color:var(--ink2);font-size:14px;font-weight:600;user-select:none}
+  details[open] summary{margin-bottom:10px}
+
+  /* --- filtry meczów --- */
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  #lgPick label.chk{padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:#111b26;color:var(--txt);font-size:13px;cursor:pointer;user-select:none}
+  #lgPick label.chk{padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:14px;cursor:pointer;user-select:none}
   #lgPick label.chk input{display:none}
-  #lgPick label.chk:has(input:checked){background:var(--acc);border-color:var(--acc);color:#04210f;font-weight:600}
-  #lgPick label.chk:has(input:checked) .league{color:#04210f;opacity:.7}
+  #lgPick label.chk:has(input:checked){background:var(--turf-soft);border-color:var(--turf);color:var(--turf);font-weight:600}
+  #lgPick label.chk:has(input:checked) .league{color:var(--turf)}
+  #lgPick label.chk:has(input:disabled){opacity:.55;cursor:not-allowed}
   #dayPick{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
-  .chip{flex:0 0 auto;background:#111b26;border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:500}
-  .chip.on{background:var(--acc);color:#04210f;border-color:var(--acc);font-weight:700}
-  .chip small{opacity:.7;margin-left:4px}
-  .league{font-size:11px;color:var(--mut)}
-  .status{color:var(--mut);font-size:12px;margin:10px 0 0}
-  .bks{display:flex;gap:6px}
-  .bks button{background:#111b26;color:var(--txt);border:1px solid var(--line);font-weight:600}
-  .bks button.on{background:#fff;color:#0f1720;border-color:#fff}
-  .grid{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:12px}
-  .grid input{width:90px}
-  details summary{cursor:pointer;color:var(--mut);font-size:13px;user-select:none}
-  #fams{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
-  .dbl{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:12px}
-  .dbl .dhead{border-radius:14px 14px 0 0}
-  .ti{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#243244;color:#93c5fd;font-size:12px;font-weight:700;cursor:help;vertical-align:middle;outline:none}
-  .ti .tb{display:none;position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);width:340px;max-width:86vw;background:#0b1118;border:1px solid #334155;border-radius:10px;padding:10px 12px;color:#cbd5e1;font-size:12px;font-weight:400;line-height:1.55;text-align:left;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.5)}
-  .ti .tb b{color:#e6edf3}
+  .chip{flex:0 0 auto;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:6px 13px;font-size:14px;font-weight:500}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+  .chip small{opacity:.65;margin-left:5px;font-family:var(--num);font-size:14px}
+  .status{color:var(--ink2);font-size:13px;margin:10px 0 0}
+
+  /* --- ustawienia --- */
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .fld>span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5px}
+  .bks{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .bks button{background:#fff;color:var(--ink);border:0;border-right:1px solid var(--line);border-radius:0;padding:8px 13px;font-weight:600;font-size:14px}
+  .bks button:last-child{border-right:0}
+  .bks button.on{background:var(--ink);color:#fff}
+  .profiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .profiles button{background:#fff;color:var(--ink);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px}
+  .profiles button b{font:700 18px/1.1 var(--num)}
+  .profiles button span{font-size:12.5px;color:var(--ink2);font-weight:400}
+  .profiles button.on{border-color:var(--turf);background:var(--turf-soft)}
+  .profiles button.on b{color:var(--turf)}
+  .main-in{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+  .main-in input{width:92px}.main-in select{min-width:120px}
+  .main-in #gen{margin-left:auto;padding:12px 24px;font-size:16px}
+  .more{margin-top:14px;border-top:1px solid var(--line2);padding-top:12px}
+  .grid{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+  .grid input{width:92px}
+  #fams{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+  .oddsHint{color:#1C4E80;font-size:13px;line-height:1.5;margin:12px 0 0;background:#EAF3FB;border-radius:8px;padding:9px 12px}
+  .dmNote{color:#4A3A86;font-size:13px;line-height:1.5;margin:8px 0 0;background:#F1EEFB;border-radius:8px;padding:9px 12px}
+
+  /* --- kupon (karta) --- */
+  .slip{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:visible;position:relative}
+  .slip::before{content:"";position:absolute;left:0;top:14px;bottom:14px;border-left:3px dotted var(--line)}
+  .slip.best{border-color:var(--turf);box-shadow:0 0 0 2px var(--turf-soft)}
+  .bestTag{display:inline-block;margin:12px 0 0 18px;background:var(--turf);color:#fff;font-weight:600;font-size:13px;padding:3px 10px;border-radius:999px}
+  .sh{display:grid;grid-template-columns:auto 1.3fr 1fr auto auto;gap:18px;align-items:end;padding:14px 18px 12px 22px;border-bottom:1px dashed var(--line)}
+  .sh .lbl{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:2px}
+  .sh .big{font:700 34px/1 var(--num);font-variant-numeric:tabular-nums}
+  .sh .mid{font:700 24px/1 var(--num);font-variant-numeric:tabular-nums}
+  .sh .approx{color:var(--amber);font:700 22px var(--num);margin-left:2px}
+  .cbar{height:7px;background:var(--line2);border-radius:4px;margin-top:6px;overflow:hidden}
+  .cbar i{display:block;height:100%;border-radius:4px}
+  .leg{display:grid;grid-template-columns:1fr 112px auto;gap:6px 14px;align-items:center;padding:11px 18px 11px 22px;border-bottom:1px solid var(--line2)}
+  .leg:last-of-type{border-bottom:0}
+  .leg.pinned{background:#F3FAF6}
+  .lmeta{font-size:12.5px;color:var(--ink2)}
+  .lmain{font-size:16px;margin:1px 0}
+  .lmain b{font-weight:700}
+  .mk{display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-weight:600;color:var(--ink)}
+  .fam{font-size:11.5px;font-weight:600;color:var(--ink2);background:var(--line2);border-radius:5px;padding:1px 7px}
+  .sig{font-size:12.5px;color:var(--ink2);margin-top:3px}
+  .sig b{color:var(--ink)}
+  .lk{text-align:right}
+  .odd-in{width:96px;font:700 20px var(--num);text-align:center;padding:5px 6px;border-width:1.5px}
+  .odd-in.src-api{border-color:var(--turf)}.odd-in.src-manual{border-color:var(--sky)}.odd-in.src-ref{border-color:var(--line)}.odd-in.src-est{border-color:var(--amber);background:var(--amber-soft)}
+  .lk .league{font-size:11.5px;margin-top:3px}
+  .lg{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+  a.go{background:#fff;color:var(--ink);border:1px solid var(--line);text-decoration:none;border-radius:7px;padding:6px 10px;font-size:13px;font-weight:600;white-space:nowrap}
+  a.go:hover{background:var(--line2)}
+  .pinb{background:transparent;border:0;padding:4px 6px;font-size:16px;opacity:.35;filter:grayscale(1)}
+  .pinb.on,.pinb:hover{opacity:1;filter:none}
+  .sf{display:flex;align-items:center;gap:8px;padding:10px 18px 12px 22px;border-top:1px dashed var(--line);background:#FAFBFC;border-radius:0 0 12px 12px}
+  .sf .dn{font:700 16px var(--num);color:var(--ink2)}
+  .sf .dk{font-weight:600}
+  .sf .dact{margin-left:auto;display:flex;gap:6px}
+  .stars{color:#E0A100;letter-spacing:1px;font-size:15px;white-space:nowrap;cursor:help}
+  .stars .off{color:#D6DEE6}
+  .warn{color:var(--amber);font-weight:600;white-space:nowrap}
+  .mvd{color:var(--turf);font-weight:600}.mvu{color:var(--red);font-weight:600}
+  .hit{font-weight:600}
+
+  /* --- dymki ⓘ --- */
+  .ti{position:relative;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--line2);color:var(--sky);font-size:12px;font-weight:700;cursor:help;vertical-align:middle}
+  .ti .tb{display:none;position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);width:350px;max-width:86vw;background:var(--ink);border-radius:10px;padding:11px 13px;color:#DCE4EE;font-size:13px;font-weight:400;line-height:1.55;text-align:left;z-index:60;box-shadow:0 12px 32px rgba(20,33,61,.28)}
+  .ti .tb b{color:#fff}
   .ti.l .tb{left:-40px;transform:none}
   .ti:hover .tb,.ti:focus .tb,.ti:focus-within .tb{display:block}
-  .ti:hover,.ti:focus{background:#38bdf8;color:#0b1118}
-  @media(max-width:700px){.ti .tb{position:fixed;left:7vw;right:7vw;top:auto;bottom:16px;transform:none;width:auto;max-width:none}}
-  .dhead{display:flex;gap:18px;align-items:center;padding:10px 14px;background:#111b26;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .dhead b{font-size:16px}
-  .dn{background:var(--acc);color:#04210f;border-radius:6px;padding:1px 8px;font-weight:800}
-  .approx{color:#f59e0b;font-weight:800}
-  .leg{display:grid;grid-template-columns:1.1fr 1.7fr 110px 120px;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
-  .leg:last-child{border-bottom:0}
-  .fam{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#243244;border-radius:4px;padding:1px 6px;margin-right:4px;color:#cbd5e1}
-  .odd-in{width:82px;font-weight:700;text-align:center;padding:6px}
-  .odd-in.src-api{border-color:#22c55e}.odd-in.src-manual{border-color:#38bdf8}.odd-in.src-ref{border-color:#475569}.odd-in.src-est{border-color:#f59e0b;color:#fcd34d}
-  .hit{font-weight:600}
-  a.go{background:#243244;color:var(--txt);text-decoration:none;border-radius:6px;padding:6px 9px;font-size:12px;font-weight:600;white-space:nowrap}
-  .empty{color:var(--mut);text-align:center;padding:28px;background:var(--panel);border:1px dashed var(--line);border-radius:14px}
-  .note{color:var(--mut);font-size:12px;line-height:1.5}
-  .dhead .dact{margin-left:auto;display:flex;gap:6px}
-  .warn{color:#f59e0b;font-weight:600;white-space:nowrap}
-  .bks.src button.on{background:#38bdf8;color:#04121f;border-color:#38bdf8}
-  .dmNote{color:#c4b5fd;font-size:12px;line-height:1.5;margin:8px 0 0;background:#1a1530;border:1px solid #3b2f6b;border-radius:8px;padding:8px 10px}
-  .presets{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:12px}
-  .presets button.on{background:#fff;color:#0f1720}
-  .presets label.inl{flex-direction:row;align-items:center;gap:6px}
-  .presets select{padding:6px 8px;font-size:13px}
-  .dk{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#cbd5e1}
-  .mvd{color:#22c55e;font-weight:700}.mvu{color:#f87171;font-weight:700}
-  .bcsum{background:#111b26;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-  @media(max-width:700px){.presets label.inl{margin-left:0!important}}
-  .oddsHint{color:#93c5fd;font-size:12px;line-height:1.5;margin:10px 0 0;background:#0f1d2b;border:1px solid #1e3a5f;border-radius:8px;padding:8px 10px}
-  .stars{color:#facc15;letter-spacing:1px;font-size:13px;white-space:nowrap;cursor:help}
-  .stars .off{color:#334155}
-  .dbl.best{border-color:#facc15;box-shadow:0 0 0 1px #facc15 inset}
-  .bestTag{background:#facc15;color:#1a1400;font-weight:800;font-size:12px;padding:4px 14px;border-radius:13px 13px 0 0}
-  .dbl.best .dhead{border-radius:0}
-  .tp{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
-  .tpn{width:24px;height:24px;border-radius:50%;background:#facc15;color:#1a1400;font-weight:800;display:grid;place-items:center;font-size:12px}
-  @media(max-width:700px){.tp{grid-template-columns:26px 1fr}.tp button{grid-column:2}}
-  .sig b{color:var(--txt)}
-  .pin{background:#1f2a1a;border:1px solid #3f6212;color:#d9f99d;border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .pinb{background:transparent;padding:4px 6px;font-size:15px;opacity:.45;filter:grayscale(1)}
-  .pinb.on,.pinb:hover{opacity:1;filter:none}
-  .leg.pinned{background:#172315}
-  .lg{display:flex;gap:6px;align-items:center;justify-content:flex-end}
-  .hrow{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:start;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+  .ti:hover,.ti:focus{background:var(--sky);color:#fff}
+
+  /* --- pozostałe sekcje --- */
+  .empty{color:var(--ink2);text-align:center;padding:28px;background:var(--card);border:1px dashed var(--line);border-radius:12px}
+  .pin{background:var(--turf-soft);border:1px solid var(--turf);color:var(--ink);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .tp{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line2)}
+  .tpn{width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font:700 14px var(--num);display:grid;place-items:center}
+  .hrow{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:start;padding:9px 0;border-top:1px solid var(--line2);font-size:14px}
   .hrow .hst{font-size:16px}
-  .hrow button.del{background:transparent;color:#ef4444;padding:2px 6px}
-  @media(max-width:700px){
-    .leg{grid-template-columns:1fr auto;gap:6px 8px}
-    .leg .lm,.leg .lt{grid-column:1/-1}
-    .leg .lk{display:flex;align-items:center;gap:8px}
-    .dhead{gap:10px}.dhead .dact{margin-left:0;width:100%}
+  .hrow button.del{background:transparent;color:var(--red);padding:2px 6px;border:0}
+  .bcsum{background:var(--line2);border-radius:9px;padding:10px 12px}
+  .foot{color:var(--ink2);font-size:13px;line-height:1.5;margin:6px 2px 0}
+
+  @media(max-width:720px){
+    header.top h1{font-size:26px}
+    .row2{grid-template-columns:1fr}
+    .profiles{grid-template-columns:1fr 1fr 1fr;gap:6px}
+    .profiles button{padding:8px}.profiles button span{display:none}
+    .main-in #gen{width:100%;margin-left:0}
+    .sh{grid-template-columns:auto 1fr auto;gap:10px 14px}
+    .sh .shq,.sh .shi{grid-column:auto}
+    .leg{grid-template-columns:1fr auto}
+    .leg .linfo{grid-column:1/-1}
+    .lk{text-align:left;display:flex;align-items:center;gap:8px}
+    .mk{margin-left:0;display:flex;margin-top:2px}
+    .tp{grid-template-columns:26px 1fr}.tp button{grid-column:2;justify-self:start}
+    .ti .tb{position:fixed;left:6vw;right:6vw;top:auto;bottom:16px;transform:none;width:auto;max-width:none}
+    .ti.l .tb{left:6vw}
   }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<header><h1>🎯 Generator dubli</h1><span>dwa różne typy · kursy wybranego bukmachera</span></header>
+<header class="top"><h1>Generator kuponów</h1><p>Dublety i trójki z prawdziwych meczów, z uczciwą szansą trafienia.</p></header>
 <main>
   <section class="panel">
-    <div class="tbar">
-      <div class="seg"><button class="sec sm" id="topBtn">⭐ Top 5 lig</button><button class="sec sm" id="cupsBtn">🏆 Puchary</button></div>
-      <div class="seg"><select id="dayRange"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select><button class="sec sm" id="reroll" title="Pobierz najnowsze dane">↻</button></div>
+    <div class="ph"><h2>Mecze</h2>
+      <div class="seg"><button class="sec sm" id="topBtn">Top 5 lig</button><button class="sec sm" id="cupsBtn">Puchary europejskie</button>
+        <select id="dayRange" aria-label="Zakres dni"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select>
+        <button class="sec sm" id="reroll" title="Pobierz najnowsze dane" aria-label="Odśwież dane">↻</button></div>
     </div>
     <div id="lgPick" class="chips"></div>
     <div id="dayPick" class="chips" style="margin-top:8px"></div>
@@ -113,65 +169,72 @@
   </section>
 
   <section class="panel">
-    <div class="tbar">
-      <div class="seg"><span class="note">Szansa:</span><div class="bks src"><button data-src="mkt" title="Z kursów bukmacherów (po odjęciu marży) — w teście najdokładniejsza">z kursów</button><button data-src="data" title="Wyłącznie z danych meczowych: siła drużyn (Elo) z ostatnich ~16 miesięcy, średnia goli w lidze, rozkład goli">z danych</button></div></div>
-      <div class="bks"><button data-bk="sts">STS</button><button data-bk="betclic">Betclic</button><button data-bk="superbet">Superbet</button><button data-bk="ref" title="Kursy orientacyjne (bet365/DraftKings)">Inne</button></div>
-      <button id="gen">Generuj kupony</button>
+    <div class="row2">
+      <div class="fld"><span>Bukmacher (kursy i linki)</span>
+        <div class="bks"><button data-bk="sts">STS</button><button data-bk="betclic">Betclic</button><button data-bk="superbet">Superbet</button><button data-bk="ref" title="Kursy orientacyjne (bet365/DraftKings)">Inny</button></div></div>
+      <div class="fld"><span>Skąd liczyć szansę</span>
+        <div class="bks src"><button data-src="mkt" title="Z kursów bukmacherów (po odjęciu marży) — w teście najdokładniejsza">z kursów</button><button data-src="data" title="Wyłącznie z danych meczowych: siła drużyn (Elo), średnia goli w lidze, rozkład goli">z danych meczowych</button></div></div>
     </div>
-    <div class="presets"><span class="note">Profil:</span>
-      <button class="sec sm" data-preset="safe" title="Typy po 1,15–1,60 · kurs kuponu dopasowany do liczby zdarzeń (dubel 1,6–2,2)">🛡️ Bezpieczny</button>
-      <button class="sec sm" data-preset="bal" title="Typy po 1,25–2,00 · kurs kuponu dopasowany do liczby zdarzeń (dubel 2,0–3,0)">⚖️ Zbalansowany</button>
-      <button class="sec sm" data-preset="bold" title="Typy po 1,60–3,50 · kurs kuponu dopasowany do liczby zdarzeń (dubel 3,0–6,0)">🔥 Odważny</button>
-      <label class="inl" style="margin-left:auto">Zdarzeń <select id="legsN"><option value="2">2 (dubel)</option><option value="3">3 (trójka)</option><option value="4">4 (czwórka)</option></select></label>
-      <label class="inl">Sortuj <select id="sortBy"><option value="q">jakość</option><option value="p">szansa</option><option value="t">kurs</option><option value="k">godzina meczu</option></select></label>
+    <div class="profiles">
+      <button data-preset="safe"><b>Bezpieczny</b><span>niskie kursy, wyższa szansa</span></button>
+      <button data-preset="bal"><b>Zbalansowany</b><span>kurs dubla ok. 2–3</span></button>
+      <button data-preset="bold"><b>Odważny</b><span>wyższe kursy, mniejsza szansa</span></button>
     </div>
-    <div class="grid">
+    <div class="main-in">
       <label>Kurs kuponu od <input id="dMin" type="number" step="0.1" min="1.01" value="2.00"></label>
       <label>do <input id="dMax" type="number" step="0.1" min="1.01" placeholder="bez limitu"></label>
-      <label>Kurs typu od <input id="legMin" type="number" step="0.05" min="1.01" value="1.04"></label>
-      <label>do <input id="legMax" type="number" step="0.05" min="1.01" value="5"></label>
-      <label>Ile propozycji <input id="dCount" type="number" min="1" max="20" value="6"></label>
+      <label>Zdarzeń <select id="legsN"><option value="2">2 — dubel</option><option value="3">3 — trójka</option><option value="4">4 — czwórka</option></select></label>
       <label>Stawka (zł) <input id="stake" type="number" min="2" step="1" value="10"></label>
-      <label>Start meczu <select id="startWin"><option value="0">dowolny</option><option value="3">w ciągu 3 h</option><option value="24">w ciągu 24 h</option><option value="48">w ciągu 48 h</option></select></label>
-    </div>
-    <div class="grid" style="margin-top:8px">
-      <label class="chk" title="Pomija kursy orientacyjne i szacowane"><input type="checkbox" id="onlyReal"> tylko kursy bukmachera</label>
-      <label class="chk" title="Pomija typy, przy których model i rynek różnią się o ponad 15 pkt proc. — w teście takie typy traciły najwięcej"><input type="checkbox" id="skipWarn" checked> pomijaj typy z rozjazdem model/rynek</label>
+      <button id="gen">Generuj kupony</button>
     </div>
     <p class="oddsHint" id="oddsHint"></p>
     <p class="dmNote" id="dmNote" style="display:none"></p>
-    <details style="margin-top:12px"><summary>Rynki w kuponach</summary><div id="fams"></div></details>
+    <details class="more"><summary>Więcej ustawień</summary>
+      <div class="grid">
+        <label>Kurs typu od <input id="legMin" type="number" step="0.05" min="1.01" value="1.04"></label>
+        <label>do <input id="legMax" type="number" step="0.05" min="1.01" value="5"></label>
+        <label>Ile propozycji <input id="dCount" type="number" min="1" max="20" value="6"></label>
+        <label>Start meczu <select id="startWin"><option value="0">dowolny</option><option value="3">w ciągu 3 h</option><option value="24">w ciągu 24 h</option><option value="48">w ciągu 48 h</option></select></label>
+        <label>Kolejność <select id="sortBy"><option value="q">wg jakości</option><option value="p">wg szansy</option><option value="t">wg kursu</option><option value="k">wg godziny meczu</option></select></label>
+      </div>
+      <div class="grid">
+        <label class="chk" title="Pomija kursy orientacyjne i szacowane"><input type="checkbox" id="onlyReal"> tylko kursy bukmachera</label>
+        <label class="chk" title="Pomija typy, przy których model i rynek różnią się o ponad 15 pkt proc. — w teście takie typy traciły najwięcej"><input type="checkbox" id="skipWarn" checked> pomijaj typy, gdzie model i rynek mocno się różnią</label>
+      </div>
+      <div class="fld"><span>Rynki w kuponach</span><div id="fams"></div></div>
+    </details>
   </section>
 
-  <section class="panel" id="topBox" style="display:none">
-    <div class="tbar"><h2 style="margin:0;font-size:15px">⭐ Najpewniejsze typy według analizy</h2><span class="note">kurs od 1,25 · różne mecze · szansa + jakość</span></div>
-    <div id="topPicks" style="margin-top:8px"></div>
-    <p class="note" style="margin:6px 0 0">Kolejność: najwyższa szansa przy dobrej <b>jakości</b> (★ = na ile ostatnie wyniki, model i kurs bukmachera potwierdzają typ). Szansa wynika z kursu — typ z szansą 75% przegrywa mniej więcej co 4. raz, niezależnie od gwiazdek.</p>
-  </section>
   <div id="pinBar"></div>
   <div id="doubles"></div>
 
+  <section class="panel" id="topBox" style="display:none">
+    <div class="ph"><h2>Najpewniejsze pojedyncze typy</h2><span class="note">kurs od 1,25, różne mecze</span></div>
+    <div id="topPicks"></div>
+    <p class="note" style="margin:8px 0 0">Wysoka szansa przy dobrej jakości (★ — na ile ostatnie wyniki, model i kurs bukmachera potwierdzają typ). Typ z szansą 75% przegrywa mniej więcej co czwarty raz.</p>
+  </section>
+
   <section class="panel">
-    <div class="tbar"><h2 style="margin:0;font-size:15px">🔍 Jak wypadłyby typy z ostatnich dni</h2><button class="sec sm" id="bcBtn">Sprawdź</button></div>
-    <p class="note" style="margin:6px 0 0">Generator z obecnymi ustawieniami (liczba zdarzeń, kursy, rynki) uruchomiony na meczach z ostatnich 3 dni, z kursami sprzed meczu — i jak to się skończyło. Uczciwa kontrola, czy to działa.</p>
+    <div class="ph"><h2>Jak wypadłyby typy z ostatnich 3 dni</h2><button class="sec sm" id="bcBtn">Sprawdź</button></div>
+    <p class="note" style="margin:0">Generator z obecnymi ustawieniami uruchomiony na meczach z ostatnich dni, z kursami sprzed meczu, i ich prawdziwe wyniki.</p>
     <div id="bc" style="margin-top:8px"></div>
   </section>
 
   <section class="panel">
-    <div class="tbar"><h2 style="margin:0;font-size:15px">📒 Moje kupony</h2><span class="note" id="histSum"></span></div>
-    <div id="hist" style="margin-top:8px"></div>
+    <div class="ph"><h2>Moje kupony</h2><span class="note" id="histSum"></span></div>
+    <div id="hist"></div>
   </section>
 
   <section class="panel">
-    <details><summary>⚙️ Źródła danych i kursów</summary>
-      <p class="note">Mecze, forma, tabela, składy, H2H i statystyki (strzały, celne, rożne, kartki): <b>ESPN</b>. Kontuzje, Ekstraklasa i <b>kursy STS / Betclic / Superbet</b> (o ile są w ofercie API): <b>API-Football</b> — z Twoim kluczem. Strony bukmacherów, SofaScore i FotMob nie udostępniają danych zewnętrznym stronom, więc nie są używane.</p>
-      <p class="note">Kolor ramki kursu: <span style="color:#22c55e">zielony</span> = kurs bukmachera z API · <span style="color:#38bdf8">niebieski</span> = wpisany ręcznie (zapamiętany dla tego bukmachera) · <span style="color:#94a3b8">szary</span> = orientacyjny (bet365/DraftKings) · <span style="color:#f59e0b">pomarańczowy</span> = szacowany ze statystyk. Kurs możesz poprawić, wpisując wartość z kuponu u bukmachera.</p>
-      <p class="note">„Szansa” typów 1X2 / podwójnej szansy / goli / BTTS = szansa z kursów po odjęciu marży (w teście na 1499 meczach dobrze skalibrowana). Rożne, kartki i celne strzały: połowa z rozkładu Poissona, połowa z ostatnich meczów obu drużyn (tylko mecze w ciągu 5 dni). „min.” = kurs uczciwy — niższy kurs u bukmachera oznacza, że typ średnio traci.</p>
-      <div class="grid" style="margin-top:6px"><input id="afKey" type="password" placeholder="klucz API-Football" style="width:260px" autocomplete="off"><button class="sec sm" id="afSave">Zapisz</button><button class="sec sm" id="afDel">Usuń</button></div>
-      <p class="note" id="afStatus">Bez klucza używane są kursy orientacyjne. <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener noreferrer" style="color:#38bdf8">Darmowe konto</a>, 100 zapytań/dzień.</p>
+    <details><summary>Źródła danych i klucz API-Football</summary>
+      <p class="note">Mecze, forma, tabela, składy i statystyki: <b>ESPN</b>. Kontuzje, Ekstraklasa i kursy STS / Betclic / Superbet (o ile są w ofercie API): <b>API-Football</b> z Twoim kluczem. Strony bukmacherów, SofaScore i FotMob nie udostępniają danych innym stronom.</p>
+      <p class="note">Ramka kursu: <b style="color:var(--turf)">zielona</b> — kurs bukmachera z API, <b style="color:var(--sky)">niebieska</b> — wpisany ręcznie, <b style="color:var(--ink2)">szara</b> — orientacyjny (bet365/DraftKings), <b style="color:var(--amber)">pomarańczowa</b> — szacowany ze statystyk. Wpisz kurs z kuponu u bukmachera, a wynik się przeliczy.</p>
+      <p class="note">„min.” przy kursie to kurs uczciwy (1 / szansa) — niższy kurs u bukmachera oznacza, że typ średnio traci.</p>
+      <div class="grid" style="margin-top:8px"><input id="afKey" type="password" placeholder="klucz API-Football" style="width:260px" autocomplete="off"><button class="sec sm" id="afSave">Zapisz klucz</button><button class="sec sm" id="afDel">Usuń klucz</button></div>
+      <p class="note" id="afStatus">Bez klucza używane są kursy orientacyjne. <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener noreferrer">Darmowe konto</a>: 100 zapytań dziennie.</p>
     </details>
   </section>
-  <p class="note">⚠️ W teście na 1499 meczach żadna strategia nie zarabiała po podatku 12%; najmniej traciło stawianie na faworytów. „Szansa” to szacunek, nie pewność — dubel z szansą 50% przegrywa co drugi raz. Remisy i kursy powyżej 5 są pomijane. 18+ · Graj odpowiedzialnie · Pomoc: 801 889 880.</p>
+  <p class="foot">W teście na 1499 meczach żadna strategia nie zarabiała po podatku 12%; najmniej traciło stawianie na faworytów. Szansa to szacunek, nie pewność: kupon z szansą 50% przegrywa co drugi raz. Remisy i kursy powyżej 5 są pomijane. 18+. Graj odpowiedzialnie. Pomoc: 801 889 880.</p>
 </main>
 <script>
 // ================= DANE (ESPN, bez klucza) =================
@@ -962,18 +1025,27 @@ function renderDoubles(){
   el.innerHTML=lastGen.map((d,n)=>{
     const legs=liveLegs(d), t=prod(legs,l=>l.odd), p=prod(legs,l=>l.p), approx=legs.some(l=>l.src==="ref"||l.src==="est");
     const dq=cpnQ(legs), best=n===bestIdx;
-    return `<div class="dbl ${best?"best":""}">${best?`<div class="bestTag">🏆 Najpewniejszy według analizy</div>`:""}
-      <div class="dhead"><span class="dn">#${n+1}</span><span class="dk">${NAMEK(legs.length)}</span>${tip(explainDouble(d,legs,t,p,parseFloat(String($("dMin").value).replace(",","."))||0),"l")}<span>Kurs <b>${t.toFixed(2)}</b>${approx?' <span class="approx" title="Zawiera kurs orientacyjny lub szacowany — sprawdź u bukmachera">≈</span>':""}</span>
-        <span>Szansa <b style="color:${p>=.5?"#16a34a":p>=.35?"#ca8a04":"#dc2626"}">${pct(p)}</b></span><span>Jakość ${starHtml(starsQ(dq),`Jakość kuponu: ${dq}/100 — na ile dane (ostatnie wyniki, model, ruch kursów, kursy) potwierdzają typy. Nie zależy od kursu.`)}</span><span>Wypłata <b>${zl(payout(t))}</b></span>
-        <span class="dact"><button class="sec sm" data-save="${n}" title="Zapisz do historii — wynik sprawdzi się sam po meczach">💾 Zapisz</button><button class="sec sm" data-copy="${n}">📋 Kopiuj</button></span></div>
+    const pc_=Math.round(p*100), barc=p>=.5?"#1E7A4C":p>=.35?"#B86E0B":"#C0392B";
+    return `<article class="slip ${best?"best":""}">${best?`<div class="bestTag">Najlepszy według analizy</div>`:""}
+      <div class="sh">
+        <div><span class="lbl">kurs</span><span class="big">${t.toFixed(2)}</span>${approx?'<span class="approx" title="Zawiera kurs orientacyjny lub szacowany — sprawdź u bukmachera">≈</span>':""}</div>
+        <div><span class="lbl">szansa trafienia</span><span class="mid" style="color:${barc}">${pc_}%</span><div class="cbar"><i style="width:${pc_}%;background:${barc}"></i></div></div>
+        <div><span class="lbl">wypłata za ${zl(stakeVal())}</span><span class="mid">${zl(payout(t))}</span></div>
+        <div class="shq"><span class="lbl">jakość</span>${starHtml(starsQ(dq),`Jakość kuponu: ${dq}/100 — na ile dane (ostatnie wyniki, model, ruch kursów, kursy) potwierdzają typy. Nie zależy od kursu.`)}</div>
+        <div class="shi">${tip(explainDouble(d,legs,t,p,parseFloat(String($("dMin").value).replace(",","."))||0),"l")}</div>
+      </div>
       ${legs.map((l,j)=>`<div class="leg ${isPinned(l)?"pinned":""}">
-        <div class="lm"><b>${esc(l.o.home)} – ${esc(l.o.away)}</b> <span class="league">${esc(l.o.league)} · ${fmtDate(l.o.date)}</span></div>
-        <div class="lt"><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> · szansa ${pct(l.p)} ${starHtml(starsQ(qual(l)),`Jakość typu: ${qual(l)}/100 — ${qWhy(l)}`)} ${tip(explainLeg(l))}
-          <div class="league sig">${signals(l)}</div></div>
-        <div class="lk"><input class="odd-in src-${l.src}" type="number" step="0.01" min="1.01" value="${l.odd.toFixed(2)}" data-dn="${n}" data-leg="${j}" title="${SRC[l.src]}">
-          <div class="league">${SRCSHORT(l.src)} · min. <b title="Kurs uczciwy (1 / szansa). Niższy kurs u bukmachera = typ średnio traci, nawet przed podatkiem.">${(1/l.p).toFixed(2)}</b></div></div>
-        <div class="lg">${bkLink(l.o)}<button class="pinb ${isPinned(l)?"on":""}" data-pin="${n}:${j}" title="${isPinned(l)?"Odepnij":"Przypnij ten typ — generator dobierze resztę"}">📌</button></div></div>`).join("")}
-    </div>`;}).join("");
+        <div class="linfo">
+          <div class="lmeta">${fmtDate(l.o.date)}, ${esc(l.o.league)}</div>
+          <div class="lmain"><b>${esc(l.o.home)} – ${esc(l.o.away)}</b><span class="mk"><span class="fam">${FAM[l.fam]}</span>${esc(LABEL(l.key))}</span></div>
+          <div class="sig">szansa <b>${pct(l.p)}</b> ${starHtml(starsQ(qual(l)),`Jakość typu: ${qual(l)}/100 — ${qWhy(l)}`)} ${tip(explainLeg(l))} ${signals(l)?"· "+signals(l):""}</div>
+        </div>
+        <div class="lk"><input class="odd-in src-${l.src}" type="number" step="0.01" min="1.01" value="${l.odd.toFixed(2)}" data-dn="${n}" data-leg="${j}" title="${SRC[l.src]}" aria-label="Kurs">
+          <div class="league">${SRCSHORT(l.src)}, min. <b title="Kurs uczciwy (1 / szansa). Niższy kurs u bukmachera = typ średnio traci.">${(1/l.p).toFixed(2)}</b></div></div>
+        <div class="lg">${bkLink(l.o)}<button class="pinb ${isPinned(l)?"on":""}" data-pin="${n}:${j}" title="${isPinned(l)?"Odepnij":"Przypnij ten typ — generator dobierze resztę"}" aria-label="Przypnij">📌</button></div></div>`).join("")}
+      <div class="sf"><span class="dn">#${n+1}</span><span class="dk">${NAMEK(legs.length)}</span>
+        <span class="dact"><button class="sec sm" data-save="${n}" title="Zapisz do historii — wynik sprawdzi się sam po meczach">Zapisz</button><button class="sec sm" data-copy="${n}">Kopiuj</button></span></div>
+    </article>`;}).join("");
 }
 function doubleText(d){
   const legs=liveLegs(d), t=prod(legs,l=>l.odd);
@@ -1109,7 +1181,7 @@ function renderTop(){
     <span class="tpn">${i+1}</span>
     <div><b>${esc(l.o.home)} – ${esc(l.o.away)}</b> <span class="league">${esc(l.o.league)} · ${fmtDate(l.o.date)}</span>
       <div><span class="fam">${FAM[l.fam]}</span> <b>${esc(LABEL(l.key))}</b> @ ${l.odd.toFixed(2)} <span class="league">(${SRCSHORT(l.src)})</span> · szansa ${pct(l.p)} ${starHtml(starsQ(qual(l)),`Jakość typu: ${qual(l)}/100 — ${qWhy(l)}`)} ${tip(explainLeg(l))}</div></div>
-    <button class="sec sm" data-toppin="${i}" title="Przypnij i dobierz drugi typ do dubla">📌 Dobierz drugi typ</button></div>`).join("");
+    <button class="sec sm" data-toppin="${i}" title="Przypnij i dobierz resztę kuponu">Dobierz do kuponu</button></div>`).join("");
 }
 function render(){ renderFilters(); renderPin(); renderTop(); renderDoubles(); }
 document.addEventListener("click",e=>{
@@ -1120,9 +1192,9 @@ document.addEventListener("click",e=>{
   if(t.id==="unpin"){ pinned=null; localStorage.removeItem("pinned"); generate(); return; }
   if(t.dataset.day){ const k=t.dataset.day; if(k==="all") selDays.clear(); else selDays.has(k)?selDays.delete(k):selDays.add(k); renderFilters(); if(lastGen) generate(); return; }
   if(t.dataset.bk){ BK=t.dataset.bk; localStorage.setItem("bk",BK); renderBk(); afBookOdds(BK); if(lastGen) generate(); return; }
-  if(t.dataset.save){ const d=lastGen?.[+t.dataset.save]; if(d){ saveDouble(d); t.textContent="✓ Zapisano"; t.disabled=true; } return; }
+  if(t.dataset.save){ const d=lastGen?.[+t.dataset.save]; if(d){ saveDouble(d); t.textContent="Zapisano"; t.disabled=true; } return; }
   if(t.dataset.copy){ const d=lastGen?.[+t.dataset.copy]; if(!d) return; const txt=doubleText(d);
-    navigator.clipboard.writeText(txt).then(()=>{t.textContent="✓ Skopiowano";setTimeout(()=>t.textContent="📋 Kopiuj",1500)}).catch(()=>prompt("Skopiuj:",txt)); return; }
+    navigator.clipboard.writeText(txt).then(()=>{t.textContent="Skopiowano";setTimeout(()=>t.textContent="Kopiuj",1500)}).catch(()=>prompt("Skopiuj:",txt)); return; }
   if(t.dataset.toppin){ const l=topList[+t.dataset.toppin]; if(!l) return; pinned={m:matchKey(l.o),k:l.key}; localStorage.setItem("pinned",JSON.stringify(pinned)); generate(); $("pinBar").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   if(t.dataset.pin){ const [n,j]=t.dataset.pin.split(":").map(Number), l=lastGen[n].legs[j];
     pinned=isPinned(l)?null:{m:matchKey(l.o),k:l.key}; pinned?localStorage.setItem("pinned",JSON.stringify(pinned)):localStorage.removeItem("pinned"); generate(); return; }
