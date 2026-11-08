@@ -63,6 +63,8 @@
   .note{color:var(--mut);font-size:12px;line-height:1.5}
   .dhead .dact{margin-left:auto;display:flex;gap:6px}
   .warn{color:#f59e0b;font-weight:600;white-space:nowrap}
+  .bks.src button.on{background:#38bdf8;color:#04121f;border-color:#38bdf8}
+  .dmNote{color:#c4b5fd;font-size:12px;line-height:1.5;margin:8px 0 0;background:#1a1530;border:1px solid #3b2f6b;border-radius:8px;padding:8px 10px}
   .presets{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:12px}
   .presets button.on{background:#fff;color:#0f1720}
   .presets label.inl{flex-direction:row;align-items:center;gap:6px}
@@ -112,6 +114,7 @@
 
   <section class="panel">
     <div class="tbar">
+      <div class="seg"><span class="note">Szansa:</span><div class="bks src"><button data-src="mkt" title="Z kursów bukmacherów (po odjęciu marży) — w teście najdokładniejsza">z kursów</button><button data-src="data" title="Wyłącznie z danych meczowych: siła drużyn (Elo) z ostatnich ~16 miesięcy, średnia goli w lidze, rozkład goli">z danych</button></div></div>
       <div class="bks"><button data-bk="sts">STS</button><button data-bk="betclic">Betclic</button><button data-bk="superbet">Superbet</button><button data-bk="ref" title="Kursy orientacyjne (bet365/DraftKings)">Inne</button></div>
       <button id="gen">Generuj kupony</button>
     </div>
@@ -136,6 +139,7 @@
       <label class="chk" title="Pomija typy, przy których model i rynek różnią się o ponad 15 pkt proc. — w teście takie typy traciły najwięcej"><input type="checkbox" id="skipWarn" checked> pomijaj typy z rozjazdem model/rynek</label>
     </div>
     <p class="oddsHint" id="oddsHint"></p>
+    <p class="dmNote" id="dmNote" style="display:none"></p>
     <details style="margin-top:12px"><summary>Rynki w kuponach</summary><div id="fams"></div></details>
   </section>
 
@@ -719,6 +723,64 @@ async function loadAllStats(){
   statsRunning=false; renderTop(); if(lastGen) generate();
 }
 
+// ---------- MODEL Z CZYSTYCH DANYCH (bez kursów) ----------
+// Elo z różnicą goli liczone na wszystkich meczach top lig i pucharów od lipca 2025, średnia goli osobno dla ligi,
+// rozkład Poissona z poprawką Dixon-Coles. Parametry dopasowane na meczach z 2026 r., sprawdzone na 599 kolejnych.
+const DM={K:10,HA:50,beta:1.0,rho:-0.1,gsc:1.04,muPrior:2.7,muN:60};
+const DM_LG=["eng.1","esp.1","ita.1","ger.1","fra.1","uefa.champions","uefa.europa","uefa.europa.conf"];
+let DMODE=localStorage.getItem("dmode")||"mkt", dmReady=false, dmLoading=false, ELO=new Map(), GOALS={}, dmCount=0;
+function dmMonths(){ const out=[], d=new Date(2025,6,1), now=new Date(); while(d<=now){ out.push(`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}`); d.setMonth(d.getMonth()+1);} return out; }
+async function loadDataModel(){
+  if(dmReady||dmLoading) return; dmLoading=true; renderDmNote();
+  const lgs=[...new Set([...DM_LG,...selLeagues.filter(l=>LEAGUES[l]&&!AF_ONLY.has(l))])], months=dmMonths(), cur=months[months.length-1];
+  const jobs=[]; lgs.forEach(lg=>months.forEach(m=>jobs.push({lg,m})));
+  let done=0;
+  const parts=await pool(jobs,8,async j=>{
+    const ck=`hm:${j.lg}:${j.m}`; if(j.m!==cur){ try{ const c=localStorage.getItem(ck); if(c){ done++; return JSON.parse(c); } }catch{} }
+    const r=await getJSON(`${ESPN}/${j.lg}/scoreboard?dates=${j.m}&limit=500`).catch(()=>null); const out=[];
+    (r?.events||[]).forEach(e=>{ const c=e.competitions[0]; if(!c.status?.type?.completed) return;
+      const H=c.competitors.find(x=>x.homeAway==="home"), A=c.competitors.find(x=>x.homeAway==="away"); if(!H||!A) return;
+      out.push([e.id,Date.parse(e.date),H.team.id,A.team.id,+H.score,+A.score,c.neutralSite?1:0,j.lg]); });
+    if(j.m!==cur&&r) try{ localStorage.setItem(ck,JSON.stringify(out)); }catch{}
+    done++; if(done%10===0) renderDmNote(`⏳ Model z danych: pobieram historię wyników ${done}/${jobs.length}…`);
+    return out; });
+  const seen=new Set(), all=parts.flat().filter(x=>x&&!seen.has(x[0])&&seen.add(x[0])).sort((a,b)=>a[1]-b[1]);
+  ELO=new Map(); GOALS={};
+  for(const [id,t,h,a,hs,as,neu,lg] of all){
+    const pool_=CUPS.has(lg)?"cups":lg, g=GOALS[pool_]||(GOALS[pool_]=[0,0]);
+    const Rh=ELO.get(h)??1500, Ra=ELO.get(a)??1500, d=(Rh+(neu?0:DM.HA)-Ra)/400;
+    const exp=1/(1+10**(-d)), res=hs>as?1:hs===as?.5:0, gd=Math.abs(hs-as), mult=gd<=1?1:gd===2?1.5:(11+gd)/8, dl=DM.K*mult*(res-exp);
+    ELO.set(h,Rh+dl); ELO.set(a,Ra-dl); g[0]+=hs+as; g[1]++;
+  }
+  dmCount=all.length; dmReady=true; dmLoading=false; offer.forEach(o=>delete o._dm); renderDmNote(); if(DMODE==="data"&&lastGen) generate(); renderTop();
+}
+function dmGrid(lh,la,rho){
+  const pf=(l,k)=>{let r=Math.exp(-l);for(let i=1;i<=k;i++)r*=l/i;return r};
+  let p1=0,px=0,p2=0,o15=0,o25=0,o35=0,bt=0,tot=0;
+  for(let i=0;i<=10;i++) for(let j=0;j<=10;j++){
+    let p=pf(lh,i)*pf(la,j);
+    if(i===0&&j===0) p*=1-lh*la*rho; else if(i===0&&j===1) p*=1+lh*rho; else if(i===1&&j===0) p*=1+la*rho; else if(i===1&&j===1) p*=1-rho;
+    tot+=p; if(i>j)p1+=p; else if(i===j)px+=p; else p2+=p; const g=i+j; if(g>=2)o15+=p; if(g>=3)o25+=p; if(g>=4)o35+=p; if(i>0&&j>0)bt+=p;
+  }
+  [p1,px,p2,o15,o25,o35,bt]=[p1,px,p2,o15,o25,o35,bt].map(v=>v/tot);
+  return [p1,px,p2,p1+px,p1+p2,px+p2,o15,1-o15,o25,1-o25,o35,1-o35,bt,1-bt];
+}
+function dmProbs(o){
+  if(!dmReady||!o.homeId||!o.awayId) return null;
+  if(o._dm) return o._dm;
+  const pool_=CUPS.has(o.lg)?"cups":o.lg, g=GOALS[pool_]||[0,0], mu=((g[0]+DM.muPrior*DM.muN)/(g[1]+DM.muN))/2;
+  const Rh=ELO.get(o.homeId)??1500, Ra=ELO.get(o.awayId)??1500, d=(Rh+(o.neutral?0:DM.HA)-Ra)/400;
+  const lh=DM.gsc*mu*Math.exp(DM.beta*d), la=DM.gsc*mu*Math.exp(-DM.beta*d);
+  return o._dm={p:dmGrid(lh,la,DM.rho),Rh,Ra,lh,la,mu2:mu*2};
+}
+function renderDmNote(msg){
+  const el=$("dmNote"); if(!el) return;
+  if(DMODE!=="data"){ el.style.display="none"; return; }
+  el.style.display="";
+  el.innerHTML=msg||(dmReady?`📐 <b>Szansa z czystych danych</b> — siła drużyn (Elo) z ${dmCount} meczów od lipca 2025, średnia goli w lidze, rozkład goli z poprawką na remisy. Kursy służą tylko do wyliczenia wypłaty. <b>Test na 599 meczach:</b> model trafiał faworyta w 54% (kursy 59%), gole i „obie strzelą” liczył trafnie; stawianie tam, gdzie model widzi więcej niż rynek, traciło 17–26%.`:`⏳ Model z danych: pobieram historię wyników…`);
+}
+function setDmode(m){ DMODE=m; localStorage.setItem("dmode",m); document.querySelectorAll("[data-src]").forEach(b=>b.classList.toggle("on",b.dataset.src===m)); renderDmNote(); renderOddsHint(); if(m==="data") loadDataModel(); offer.forEach(o=>delete o._dm); if(lastGen) generate(); renderTop(); }
+
 // ---------- kandydaci (typy) ----------
 function legsFor(o){
   if(!o.real&&!o.manual) return [];
@@ -727,11 +789,14 @@ function legsFor(o){
   for(const [k,i,fam] of CORE){
     if(!fams.has(fam)) continue;
     const pm=a.mk.p[i], pmo=a.mo.p[i];
-    const p=pm!=null?pm:a.fin[i]; if(p==null) continue;          // 1) ranking wg szansy rynkowej (bez marży)
+    const dm=DMODE==="data"?dmProbs(o):null;
+    if(DMODE==="data"&&!dm) continue;
+    const p=dm?dm.p[i]:(pm!=null?pm:a.fin[i]); if(p==null) continue;   // szansa: z danych albo z kursów (bez marży)
     const od=oddsFor(o,k); if(!od) continue;
     const h=hit10(o,i), emp=h?(h.hn+h.an)/(h.hN+h.aN):null;
     const mv=(o.open?.[i]>1&&o.odds[i]>1)?o.odds[i]/o.open[i]-1:null;   // ruch kursu rynkowego od otwarcia
-    out.push({o,key:k,fam,p,pMarket:pm,pModel:pmo,emp,odd:od.k,src:od.src,hit:h,warn:pm!=null&&Math.abs(pmo-pm)>DISAGREE,mv,odd0:o.open?.[i]||null,oddNow:o.odds[i]});
+    const pmodel=dm?dm.p[i]:pmo;
+    out.push({o,key:k,fam,p,pMarket:pm,pModel:pmodel,pData:dm?dm.p[i]:null,dm,emp,odd:od.k,src:od.src,hit:h,warn:pm!=null&&pmodel!=null&&Math.abs(pmodel-pm)>DISAGREE,mv,odd0:o.open?.[i]||null,oddNow:o.odds[i]});
   }
   if(sp) for(const [k,fam] of STATM){
     if(!fams.has(fam)) continue; const s=sp[k]; const od=oddsFor(o,k,s.p); if(!od) continue;
@@ -745,7 +810,7 @@ function legsFor(o){
 // a jakość mówi, czy inne dane ten typ potwierdzają: ostatnie wyniki, model, prawdziwy kurs, wielkość próbki.
 function qual(l){
   if(l._q!=null) return l._q;
-  const base=l.pMarket??(l.sp?l.sp.pPois:l.p), n=l.hit?l.hit.hN+l.hit.aN:0, why=[];
+  const base=l.pData??l.pMarket??(l.sp?l.sp.pPois:l.p), n=l.hit?l.hit.hN+l.hit.aN:0, why=[];
   let q=60;
   if(l.emp!=null){ const d=l.emp-base, v=clamp(d*120,-30,15); q+=v;
     why.push(d>=0.05?`ostatnie wyniki potwierdzają (${pc(l.emp)} wobec ${pc(base)})`:d<=-0.05?`ostatnie wyniki słabsze (${pc(l.emp)} wobec ${pc(base)})`:"ostatnie wyniki zgodne z szansą"); }
@@ -804,6 +869,7 @@ function combine(legs,k,minT,maxT,pin){
     .map(c=>({legs:c,t:prod(c,x=>x.odd),p:prod(c,x=>x.p),s:prod(c,score)}));
 }
 function generate(){
+  if(DMODE==="data"&&!dmReady){ loadDataModel(); $("doubles").innerHTML=`<div class="empty">⏳ Liczę model z czystych danych (historia wyników od lipca 2025)… Kupony pojawią się za chwilę.</div>`; lastGen=lastGen||[]; return; }
   const minT=parseFloat(String($("dMin").value).replace(",","."))||1.5, maxT=parseFloat(String($("dMax").value).replace(",","."))||999;
   const N=Math.max(1,Math.min(20,parseInt($("dCount").value)||6)), win=+$("startWin").value||0, K=+$("legsN").value||2;
   const now=Date.now();
@@ -836,11 +902,12 @@ const pc=v=>v==null?"–":Math.round(v*100)+"%";
 const colr=v=>v==null?"#8b9bb0":v>=.6?"#16a34a":v>=.4?"#ca8a04":"#dc2626";
 function signals(l){
   const parts=[];
+  if(l.pData!=null) parts.push(`dane <b>${pc(l.pData)}</b>`);
   if(l.pMarket!=null) parts.push(`rynek <b>${pc(l.pMarket)}</b>`);
   else if(l.E!=null) parts.push(`prognoza <b>${l.E.toFixed(1)}</b>`);
   if(l.mv!=null&&Math.abs(l.mv)>=0.02) parts.push(`<span class="${l.mv<0?"mvd":"mvu"}" title="Kurs rynkowy od otwarcia: ${l.odd0.toFixed(2)} → ${l.oddNow.toFixed(2)}. Spadający kurs = rynek coraz bardziej wierzy w ten typ.">${l.mv<0?"↓":"↑"} kurs ${Math.abs(Math.round(l.mv*100))}%</span>`);
   if(l.hit) parts.push(`<span title="Ostatnie mecze: ${esc(l.hit.lh||"gosp.")} ${l.hit.hn}/${l.hit.hN}, ${esc(l.hit.la||"gość")} ${l.hit.an}/${l.hit.aN}">ost. mecze <b style="color:${colr(l.emp)}">${pc(l.emp)}</b></span>`);
-  if(l.pModel!=null) parts.push(`model ${pc(l.pModel)}${l.warn?` <span class="warn" title="Model i rynek różnią się o ponad 15 pkt proc. — w teście takie typy traciły najwięcej">⚠️ rozjazd</span>`:""}`);
+  if(l.pModel!=null&&l.pData==null) parts.push(`model ${pc(l.pModel)}${l.warn?` <span class="warn" title="Model i rynek różnią się o ponad 15 pkt proc. — w teście takie typy traciły najwięcej">⚠️ rozjazd</span>`:""}`);
   const srcAgree=[l.pMarket??l.p,l.emp].filter(v=>v!=null); const spread=srcAgree.length>1?Math.abs(srcAgree[0]-srcAgree[1]):0;
   if(spread>0.2) parts.push(`<span class="warn" title="Szansa i wyniki z ostatnich meczów mocno się różnią">⚠️ sygnały niezgodne</span>`);
   return parts.join(" · ");
@@ -858,7 +925,8 @@ function explainLeg(l){
     lines.push(`<b>Ostatnie mecze:</b> próg wszedł u gospodarza ${l.hit.hn}/${l.hit.hN}, u gościa ${l.hit.an}/${l.hit.aN}.`);
   } else {
     const c=CORE.find(x=>x[0]===l.key), a=analyze(o), g=GROUPS.find(G=>G.i.includes(c[1])), gi=GROUPS.indexOf(g), m=a.mk.m[gi];
-    if(l.pMarket!=null) lines.push(`<b>Skąd ${pct(l.p)}:</b> z kursów bukmacherów po odjęciu ich marży${m!=null?` (${pct(m)})`:""}. W teście na 1499 meczach ta miara była najlepiej skalibrowana.`);
+    if(l.dm) lines.push(`<b>Skąd ${pct(l.p)}:</b> wyłącznie z danych — siła drużyn Elo: ${esc(o.home)} <b>${Math.round(l.dm.Rh)}</b>, ${esc(o.away)} <b>${Math.round(l.dm.Ra)}</b>${o.neutral?"":" (+50 za własne boisko)"}; średnia goli w tej lidze ${l.dm.mu2.toFixed(2)} → oczekiwane gole ${l.dm.lh.toFixed(2)} : ${l.dm.la.toFixed(2)}; rozkład Poissona z poprawką na remisy. Rynek (kursy) daje ${pct(l.pMarket)}.`);
+    else if(l.pMarket!=null) lines.push(`<b>Skąd ${pct(l.p)}:</b> z kursów bukmacherów po odjęciu ich marży${m!=null?` (${pct(m)})`:""}. W teście na 1499 meczach ta miara była najlepiej skalibrowana.`);
     if(l.fam==="1X2"||l.fam==="DC"){
       lines.push(`<b>Forma (ost. 5):</b> ${esc(o.home)} ${fmtForm(H.form)} · ${esc(o.away)} ${fmtForm(A.form)}`);
       lines.push(`<b>Gdzie grają:</b> ${esc(o.home)} u siebie ${H.venueRec||"–"} (W-R-P) · ${esc(o.away)} na wyjeździe ${A.venueRec||"–"}${H.stand&&A.stand?` · tabela: ${H.stand.rank}. vs ${A.stand.rank}.`:""}`);
@@ -967,6 +1035,7 @@ function renderHist(){
 
 function renderOddsHint(){
   const m=parseFloat(String($("dMin").value).replace(",","."))||0;
+  if(DMODE==="data"){ $("oddsHint").innerHTML=m>1?`ℹ️ W trybie „z danych” szansa nie wynika z kursu — może być wyższa lub niższa niż sugeruje bukmacher (przy kursie ${m.toFixed(2)} rynek daje ok. ${Math.round(91/m)}%). Pamiętaj: w teście rynek był dokładniejszy niż model.`:""; return; }
   $("oddsHint").innerHTML=m>1?`ℹ️ Przy kursie od <b>${m.toFixed(2)}</b> każdy kupon ma ok. <b>${Math.round(91/m)}%</b> szansy — kurs to cena prawdopodobieństwa (minus marża), więc przy tym kursie wyżej się nie da. Chcesz większą szansę — obniż kurs. <b>★ Jakość</b> pokazuje, które kupony najlepiej potwierdzają dane.`:"";
 }
 // ---------- profile ----------
@@ -1044,8 +1113,9 @@ function renderTop(){
 }
 function render(){ renderFilters(); renderPin(); renderTop(); renderDoubles(); }
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-day],[data-bk],[data-save],[data-copy],[data-pin],[data-toppin],[data-hdel],[data-preset],#unpin,#bcBtn"); if(!t) return;
+  const t=e.target.closest("[data-day],[data-bk],[data-save],[data-copy],[data-pin],[data-toppin],[data-hdel],[data-preset],[data-src],#unpin,#bcBtn"); if(!t) return;
   if(t.dataset.preset){ applyPreset(t.dataset.preset); generate(); return; }
+  if(t.dataset.src){ setDmode(t.dataset.src); return; }
   if(t.id==="bcBtn"){ backcheck(); return; }
   if(t.id==="unpin"){ pinned=null; localStorage.removeItem("pinned"); generate(); return; }
   if(t.dataset.day){ const k=t.dataset.day; if(k==="all") selDays.clear(); else selDays.has(k)?selDays.delete(k):selDays.add(k); renderFilters(); if(lastGen) generate(); return; }
@@ -1110,6 +1180,7 @@ function autoTick(){ if(loading||document.visibilityState!=="visible") return; i
 setInterval(autoTick,60e3); document.addEventListener("visibilitychange",autoTick);
 const _loadReal=loadReal;
 loadReal=async function(reset=true){ await _loadReal(reset); if(!loading){ loadAllStats(); if(lastGen) generate(); } };
+document.querySelectorAll("[data-src]").forEach(b=>b.classList.toggle("on",b.dataset.src===DMODE)); renderDmNote(); if(DMODE==="data") loadDataModel();
 renderBk(); renderHist(); render(); loadReal(); checkHist();
 
 </script>
